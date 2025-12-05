@@ -87,26 +87,6 @@ the versions listed. Ingress-Nginx versions **may** work on older versions, but 
 See [this article](https://kubernetes.io/blog/2021/07/26/update-with-ingress-nginx/) if you want upgrade to the stable
 Ingress API.
 
-## Get Involved
-
-Thanks for taking the time to join our community and start contributing!
-
-- This project adheres to the [Kubernetes Community Code of Conduct](https://git.k8s.io/community/code-of-conduct.md).
-  By participating in this project, you agree to abide by its terms.
-- **Contributing**: Contributions of all kinds are welcome!
-
-  - Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for information about setting up your environment, the workflow that we
-    expect, and instructions on the developer certificate of origin that we require.
-  - Join our Kubernetes Slack channel for developer discussion : [#ingress-nginx-dev](https://kubernetes.slack.com/archives/C021E147ZA4).
-  - Submit GitHub issues for any feature enhancements, bugs, or documentation problems.
-    - Please make sure to read the [Issue Reporting Checklist](https://github.com/kubernetes/ingress-nginx/blob/main/CONTRIBUTING.md#issue-reporting-guidelines) before opening an issue. Issues not conforming to the guidelines **may be closed immediately**.
-  - Join our [ingress-nginx-dev mailing list](https://groups.google.com/a/kubernetes.io/g/ingress-nginx-dev/c/ebbBMo-zX-w)
-- **Support**:
-
-  - Join the [#ingress-nginx-users](https://kubernetes.slack.com/messages/CANQGM8BA/) channel inside the [Kubernetes Slack](http://slack.kubernetes.io/) to ask questions or get support from the maintainers and other users.
-  - The [GitHub issues](https://github.com/kubernetes/ingress-nginx/issues) in the repository are **exclusively** for bug reports and feature requests.
-  - **Discuss**: Tweet using the `#IngressNginx` hashtag or sharing with us [@IngressNginx](https://twitter.com/IngressNGINX).
-
 ## License
 
 [Apache License 2.0](https://github.com/kubernetes/ingress-nginx/blob/main/LICENSE)
