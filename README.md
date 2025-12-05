@@ -6,6 +6,38 @@
 [![GitHub stars](https://img.shields.io/github/stars/kubernetes/ingress-nginx.svg)](https://github.com/kubernetes/ingress-nginx/stargazers)
 [![GitHub stars](https://img.shields.io/badge/contributions-welcome-orange.svg)](https://github.com/kubernetes/ingress-nginx/blob/main/CONTRIBUTING.md)
 
+> [!IMPORTANT]
+> This is a supported replacement of the original `kubernetes/ingress-nginx`
+> repository, [which will be archived in March of 2026](https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/). Further details in
+> [History and Status](#history-and-status).
+
+> Community contributions are not being accepted at this time. The documentation
+> has been carried over directly from the original repository and may not reflect
+> recent changes. We will update dependencies only to resolve security
+> vulnerabilities (CVEs). If a dependency update to resolve a CVE requires more than updating
+> dependency versions, if it, for instance, requires making extensive changes to accommodate
+> a new API, we will, as a general policy, not make that change in order to avoid accidentally
+> introducing a regression.
+
+## History and Status
+
+ingress-nginx was originally published at
+[kubernetes/ingress-nginx](https://github.com/kubernetes/ingress-nginx).
+The project will be archived in March 2026.
+
+No feature work is planned.
+
+## Releases
+
+ingress-nginx releases are only created as [tags on the source
+repository](https://github.com/chainguard-forks/ingress-nginx/tags).
+
+Release notes and source code archives are available on the [releases
+section](https://github.com/chainguard-forks/ingress-nginx/releases).
+
+Binary release artifacts such as container images are **not published**.
+
+
 ## Overview
 
 ingress-nginx is an Ingress controller for Kubernetes using [NGINX](https://www.nginx.org/) as a reverse proxy and load
