@@ -1,7 +1,7 @@
 ARG E2E_BASE_IMAGE
 FROM ${E2E_BASE_IMAGE} AS BASE
 
-FROM alpine:3.22.2
+FROM alpine:3.22.2@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412
 
 RUN apk update \
 	&& apk upgrade && apk add -U --no-cache \

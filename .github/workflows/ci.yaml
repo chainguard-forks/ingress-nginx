@@ -46,6 +46,11 @@ jobs:
 
     steps:
 
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2 # v2.13.3
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
@@ -80,11 +85,16 @@ jobs:
     if: |
       (needs.changes.outputs.lua == 'true') || ${{ github.event.workflow_dispatch.run_e2e == 'true' }}
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2 # v2.13.3
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       
       - name: Lint Lua
-        uses: lunarmodules/luacheck@v1
+        uses: lunarmodules/luacheck@cc089e3f65acdd1ef8716cc73a3eca24a6b845e4 # v1.2.0
         with:
           args: --codes --globals lua_ingress --globals configuration --globals balancer --globals monitor --globals certificate --globals tcp_udp_configuration --globals tcp_udp_balancer --no-max-comment-line-length -q rootfs/etc/nginx/lua/
 
@@ -94,6 +104,11 @@ jobs:
     if: |
       (needs.changes.outputs.go == 'true') || ${{ github.event.workflow_dispatch.run_e2e == 'true' }}
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2 # v2.13.3
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
@@ -118,6 +133,11 @@ jobs:
     if: |
       (needs.changes.outputs.go == 'true') || (needs.changes.outputs.docs == 'true') || ${{ github.event.workflow_dispatch.run_e2e == 'true' }}
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2 # v2.13.3
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Get go version
@@ -143,6 +163,11 @@ jobs:
     env:
         PLATFORMS: linux/amd64
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2 # v2.13.3
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
@@ -217,6 +242,11 @@ jobs:
     if: fromJSON(needs.changes.outputs.charts) || fromJSON(needs.changes.outputs.baseimage) || fromJSON(github.event.workflow_dispatch.run_e2e)
 
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2 # v2.13.3
+        with:
+          egress-policy: audit
+
       - name: Set up Python
         uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
         with:
@@ -276,6 +306,11 @@ jobs:
         k8s: [v1.30.13, v1.31.12, v1.32.8, v1.33.4, v1.34.0]
 
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2 # v2.13.3
+        with:
+          egress-policy: audit
+
       - name: Checkout code
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
