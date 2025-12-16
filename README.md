@@ -46,7 +46,27 @@ balancer.
 
 ## Get started
 
-See the [Getting Started](https://kubernetes.github.io/ingress-nginx/deploy/) document.
+This fork is maintained but does not create images or helm charts. 
+
+To create new images, clone this repository and run `make build image` and `make build image-chroot`. This will create images for a single architecture that can be used in testing. To create a multi-arch image and upload to a registry use the `make release` command and set the `REGISTRY` variable appropriately e.g:
+
+```
+REGISTRY=my.registry.com make release
+```
+
+To use these images with the official helm charts you will need to override the default settings e.g:
+
+```
+helm upgrade --install ingress-nginx ingress-nginx \
+  --repo https://kubernetes.github.io/ingress-nginx \
+  --namespace ingress-nginx --create-namespace \
+  --set controller.image.registry=my-registry.io \
+  --set controller.image.image=ingress-nginx/controller \
+  --set controller.image.tag=v1.10.0 \
+  ...
+```
+
+With this is mind, refer to the orginal [Getting Started](https://kubernetes.github.io/ingress-nginx/deploy/) document for more information.
 
 Do not use in multi-tenant Kubernetes production installations. This project assumes that users that can create Ingress objects are administrators of the cluster. See the [FAQ](https://kubernetes.github.io/ingress-nginx/faq/#faq) for more.
 
