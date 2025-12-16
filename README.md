@@ -66,7 +66,9 @@ helm upgrade --install ingress-nginx ingress-nginx \
   ...
 ```
 
-With this is mind, refer to the orginal [Getting Started](https://kubernetes.github.io/ingress-nginx/deploy/) document for more information.
+To change or update the base image used for building these images, update the file `NGINX_BASE`.
+
+With these points in mind, refer to the orginal [Getting Started](https://kubernetes.github.io/ingress-nginx/deploy/) document for more information.
 
 Do not use in multi-tenant Kubernetes production installations. This project assumes that users that can create Ingress objects are administrators of the cluster. See the [FAQ](https://kubernetes.github.io/ingress-nginx/faq/#faq) for more.
 
