@@ -267,20 +267,7 @@ release: builder clean
 		--build-arg VERSION="$(TAG)" \
 		--build-arg COMMIT_SHA="$(COMMIT_SHA)" \
 		--build-arg BUILD_ID="$(BUILD_ID)" \
-		-t $(REGISTRY)/controller:$(TAG) rootfs
-
-	docker buildx build \
-		--no-cache \
-		$(MAC_DOCKER_FLAGS) \
-		--push \
-		--pull \
-		--progress plain \
-		--platform $(BUILDX_PLATFORMS)  \
-		--build-arg BASE_IMAGE="$(BASE_IMAGE)" \
-		--build-arg VERSION="$(TAG)" \
-		--build-arg COMMIT_SHA="$(COMMIT_SHA)" \
-		--build-arg BUILD_ID="$(BUILD_ID)" \
-		-t $(REGISTRY)/controller-chroot:$(TAG) rootfs -f rootfs/Dockerfile-chroot
+		-t $(REGISTRY)/chainguard-nginx-ingress:$(TAG) rootfs
 
 .PHONY: build-docs
 build-docs:

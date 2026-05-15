@@ -1,0 +1,111 @@
+name: Build controller image
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ASSUME_ROLE: arn:aws:iam::968519194283:role/GitHubAssumeRole
+  ECR_REPO: chainguard-nginx-ingress
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Resolve tag
+        id: tags
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          VERSION=$(cat TAG)
+          SHORT_SHA=${GITHUB_SHA::7}
+          echo "immutable=${VERSION}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
+        with:
+          role-to-assume: ${{ env.AWS_ASSUME_ROLE }}
+          role-session-name: ${{ github.event.repository.name }}-${{ github.run_id }}-${{ matrix.arch }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@19d944daaa35f0fa1d3f7f8af1d3f2e5de25c5b7 # v2.1.4
+
+      - name: Build and push per-arch image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          TAG: ${{ steps.tags.outputs.immutable }}-${{ matrix.arch }}
+          PLATFORMS: ${{ matrix.arch }}
+          BUILDX_PLATFORMS: linux/${{ matrix.arch }}
+          COMMIT_SHA: ${{ github.sha }}
+          BUILD_ID: ${{ github.run_id }}
+        run: make release
+
+  manifest:
+    name: Multi-arch manifest
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Resolve tag
+        id: tags
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          VERSION=$(cat TAG)
+          SHORT_SHA=${GITHUB_SHA::7}
+          echo "immutable=${VERSION}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
+        with:
+          role-to-assume: ${{ env.AWS_ASSUME_ROLE }}
+          role-session-name: ${{ github.event.repository.name }}-${{ github.run_id }}-manifest
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@19d944daaa35f0fa1d3f7f8af1d3f2e5de25c5b7 # v2.1.4
+
+      - name: Create multi-arch manifest
+        env:
+          ECR: ${{ steps.login-ecr.outputs.registry }}
+          TAG: ${{ steps.tags.outputs.immutable }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            -t "${ECR}/${ECR_REPO}:${TAG}" \
+            "${ECR}/${ECR_REPO}:${TAG}-amd64" \
+            "${ECR}/${ECR_REPO}:${TAG}-arm64"
