@@ -1,13 +1,8 @@
 name: Chart
 
 on:
-  push:
-    branches:
-      - main
-      - release-*
-    paths:
-      - charts/ingress-nginx/Chart.yaml
-  
+  schedule:
+    - cron: '0 0 * * 1' # every Monday at 00:00 UTC
   workflow_dispatch:
 
 permissions:
@@ -40,12 +35,6 @@ jobs:
       - name: Set up Helm Chart Testing
         uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f
 
-      - name: Set up Artifact Hub
-        run: |
-          curl --fail --location https://github.com/artifacthub/hub/releases/download/v1.20.0/ah_1.20.0_linux_amd64.tar.gz --output /tmp/ah.tar.gz
-          echo "9027626f19ff9f3ac668f222917130ac885e289e922e1428bfd2e7f066324e31  /tmp/ah.tar.gz" | shasum --check
-          sudo tar --extract --file /tmp/ah.tar.gz --directory /usr/local/bin ah
-
       - name: Set up Git
         run: |
           git config --global user.name "${GITHUB_ACTOR}"
@@ -56,12 +45,31 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Lint chart
+      - name: Check if Chart.yaml version warrants a release
+        id: check
         run: |
-          ct lint --config .ct.yaml
-          ah lint --path charts/ingress-nginx
+          git fetch --tags
+          CHART_VERSION=$(grep '^version:' charts/ingress-nginx/Chart.yaml | awk '{print $2}')
+          LAST_TAG=$(git tag --list 'helm-chart-*' --sort=-v:refname | head -1)
+          LAST_VERSION="${LAST_TAG#helm-chart-}"
+
+          echo "Chart.yaml version: $CHART_VERSION"
+          echo "Last released version: ${LAST_VERSION:-none}"
+
+          if [ "$CHART_VERSION" != "$LAST_VERSION" ]; then
+            echo "Chart version differs from last release. Proceeding."
+            echo "need_release=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "Chart version unchanged since last release. Skipping."
+            echo "need_release=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lint chart
+        if: steps.check.outputs.need_release == 'yes'
+        run: ct lint --config .ct.yaml
 
       - name: Release chart
+        if: steps.check.outputs.need_release == 'yes'
         uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # v1.7.0
         env:
           CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
