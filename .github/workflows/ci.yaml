@@ -215,8 +215,12 @@ jobs:
           REGISTRY: ingress-controller
         run: |
           echo "building images..."
-          export TAGNGINX=$(cat images/nginx/TAG)
-          make BASE_IMAGE=registry.k8s.io/ingress-nginx/nginx:${TAGNGINX} clean-image build image image-chroot
+          if [ "${{ needs.changes.outputs.baseimage }}" = "true" ]; then
+            export BASE_IMAGE=registry.k8s.io/ingress-nginx/nginx:$(cat images/nginx/TAG)
+          else
+            export BASE_IMAGE=$(cat NGINX_BASE)
+          fi
+          make BASE_IMAGE=${BASE_IMAGE} clean-image build image image-chroot
           make -C test/e2e-image image
 
           echo "creating images cache..."
