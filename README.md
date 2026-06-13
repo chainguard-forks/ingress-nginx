@@ -7,6 +7,24 @@
 >
 > Interested in a CVE-free container image of this project? [Contact Chainguard](https://www.chainguard.dev/contact).
 
+## NGINX source patches and ABI
+
+This fork compiles NGINX from source with a series of patches applied from
+`images/nginx/rootfs/patches/` (the `NN_nginx-<version>-*.patch` files). These
+include best-effort backports of NGINX source CVEs that upstream did not ship
+for the bundled NGINX release line.
+
+> [!NOTE]
+> Some of these patches add fields to core NGINX structures. For example, the
+> `max_headers` backport for CVE-2026-49975 adds a counter to
+> `ngx_http_headers_in_t`, which is embedded in `ngx_http_request_t`, so it
+> changes the binary layout of those structures relative to stock NGINX. Every
+> dynamic module shipped in this image is compiled against the patched headers,
+> so the image itself is self-consistent. However, a third-party NGINX dynamic
+> module built against an unpatched NGINX of the same version may be
+> ABI-incompatible and should be rebuilt against this fork's headers before it
+> is loaded into the controller.
+
 ## Overview
 
 ingress-nginx was an Ingress controller for Kubernetes using [NGINX](https://www.nginx.org/) as a reverse proxy and load
