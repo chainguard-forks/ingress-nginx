@@ -2,7 +2,7 @@
 
 [ingress-nginx](https://github.com/kubernetes/ingress-nginx) Ingress controller for Kubernetes using NGINX as a reverse proxy and load balancer
 
-![Version: 4.15.6](https://img.shields.io/badge/Version-4.15.6-informational?style=flat-square) ![AppVersion: 1.15.6](https://img.shields.io/badge/AppVersion-1.15.6-informational?style=flat-square)
+![Version: 4.15.7](https://img.shields.io/badge/Version-4.15.7-informational?style=flat-square) ![AppVersion: 1.15.6](https://img.shields.io/badge/AppVersion-1.15.6-informational?style=flat-square)
 
 To use, add `ingressClassName: nginx` spec field or the `kubernetes.io/ingress.class: nginx` annotation to your Ingress resources.
 
@@ -264,6 +264,7 @@ metadata:
 | controller.admissionWebhooks.createSecretJob.name | string | `"create"` |  |
 | controller.admissionWebhooks.createSecretJob.resources | object | `{}` |  |
 | controller.admissionWebhooks.createSecretJob.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":65532,"runAsNonRoot":true,"runAsUser":65532,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for secret creation containers |
+| controller.admissionWebhooks.createSecretJob.ttlSecondsAfterFinished | int | `0` | Seconds after the job finishes before it is eligible to be automatically deleted. If the field is set to 0, the Job will be eligible to be automatically deleted immediately after it finishes. |
 | controller.admissionWebhooks.createSecretJob.volumeMounts | list | `[]` | Volume mounts for secret creation containers |
 | controller.admissionWebhooks.createSecretJob.volumes | list | `[]` | Volumes for secret creation pod |
 | controller.admissionWebhooks.enabled | bool | `true` |  |
@@ -297,6 +298,7 @@ metadata:
 | controller.admissionWebhooks.patchWebhookJob.name | string | `"patch"` |  |
 | controller.admissionWebhooks.patchWebhookJob.resources | object | `{}` |  |
 | controller.admissionWebhooks.patchWebhookJob.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":65532,"runAsNonRoot":true,"runAsUser":65532,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for webhook patch containers |
+| controller.admissionWebhooks.patchWebhookJob.ttlSecondsAfterFinished | int | `0` | Seconds after the job finishes before it is eligible to be automatically deleted. If the field is set to 0, the Job will be eligible to be automatically deleted immediately after it finishes. |
 | controller.admissionWebhooks.patchWebhookJob.volumeMounts | list | `[]` | Volume mounts for webhook patch containers |
 | controller.admissionWebhooks.patchWebhookJob.volumes | list | `[]` | Volumes for webhook patch pod |
 | controller.admissionWebhooks.port | int | `8443` |  |
