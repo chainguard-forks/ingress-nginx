@@ -53,6 +53,18 @@ RUN apk update \
   libprotobuf \
   abseil-cpp-crc-cpu-detect \
   abseil-cpp-vlog-config-internal \
+  # Force curl/libcurl to a patched build. Alpine 3.23-stable still ships
+  # curl/libcurl 8.20.0-r0 (transitively pulled in via grpc-cpp), which is
+  # affected by several curl CVEs fixed upstream in 8.21.0, including
+  # CVE-2026-8924, CVE-2026-8925, CVE-2026-8926, CVE-2026-9080,
+  # CVE-2026-9545, CVE-2026-9546, CVE-2026-9547, CVE-2026-11564,
+  # CVE-2026-11856 and CVE-2026-12064. The fix has not yet been backported
+  # to the 3.23-stable branch, so pull the patched packages from edge until
+  # it is. Remove this once 3.23-stable ships curl/libcurl >= 8.21.0.
+  && apk add -U --no-cache \
+  --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
+  'curl>=8.21.0-r0' \
+  'libcurl>=8.21.0-r0' \
   && ln -s /usr/local/nginx/sbin/nginx /sbin/nginx \
   && adduser -S -D -H -u 101 -h /usr/local/nginx \
   -s /sbin/nologin -G www-data -g www-data www-data \
