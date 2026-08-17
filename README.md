@@ -1,123 +1,189 @@
-> [!IMPORTANT]
-> This is a supported replacement of the original [kubernetes/ingress-nginx](https://github.com/kubernetes/ingress-nginx) repository, which was archived on March 24, 2026.
->
-> Community contributions are not being accepted at this time. The documentation has been carried over directly from the original repository and may not reflect recent changes.
->
-> We will make a best-effort attempt to address publicly known security vulnerabilities, including CVEs in dependencies and certain source code vulnerabilities when remediation can be achieved safely and with minimal risk. If mitigating a vulnerability would require extensive code changes (for example, adapting to a new API or significant refactoring), we will generally not make that change in order to avoid introducing regressions.
->
-> Interested in a CVE-free container image of this project? [Contact Chainguard](https://www.chainguard.dev/contact).
+# ingress-nginx (Rubin Observatory DM-SQuaRE fork)
 
-## NGINX source patches and ABI
+## USE AT YOUR OWN RISK
 
-This fork compiles NGINX from source with a series of patches applied from
-`images/nginx/rootfs/patches/` (the `NN_nginx-<version>-*.patch` files). These
-include best-effort backports of NGINX source CVEs that upstream did not ship
-for the bundled NGINX release line.
+We're not ingress-nginx maintainers, and we are not qualified to be.
+If you found this repository while you were looking for some way to put a more modern NGINX into ingress-nginx-controller, you're welcome to try.
+However, it's entirely on you to succeed or fail, and we accept no responsibility if something horrible happens to your Kubernetes deployment if you use this package.
+We offer no support, and issues filed against it will most likely be cheerfully ignored.
 
-> [!NOTE]
-> Some of these patches add fields to core NGINX structures. For example, the
-> `max_headers` backport for CVE-2026-49975 adds a counter to
-> `ngx_http_headers_in_t`, which is embedded in `ngx_http_request_t`, so it
-> changes the binary layout of those structures relative to stock NGINX. Every
-> dynamic module shipped in this image is compiled against the patched headers,
-> so the image itself is self-consistent. However, a third-party NGINX dynamic
-> module built against an unpatched NGINX of the same version may be
-> ABI-incompatible and should be rebuilt against this fork's headers before it
-> is loaded into the controller.
+## Rationale
 
-## Overview
+This repository is designed to be a stopgap until Rubin Observatory can migrate to the K8s Gateway API.
 
-ingress-nginx was an Ingress controller for Kubernetes using [NGINX](https://www.nginx.org/) as a reverse proxy and load
-balancer.
+We accept that [ingress-nginx is no longer maintainable](README-orig.md).
 
-[Learn more about Ingress on the Kubernetes documentation site](https://kubernetes.io/docs/concepts/services-networking/ingress/).
+Nevertheless, we were unable to move away from ingress-nginx by the maintenance deadline and then the subsequent discovery of a major vulnerability.
+Thus we've decided to rebuild the ingress-nginx controller with a version of NGINX that does not include the vulnerability.
 
-## Usage warnings
+## Changes from the parent repository
 
-If you are not already using ingress-nginx, you should not be deploying it as it is [not being developed](#retiring). Instead you should identify a [Gateway API](https://gateway-api.sigs.k8s.io/guides/) implementation and use it.
+In addition to the obvious changes to the nginx base image and what repository it lives in, we've done a few other things:
 
-Do not use in multi-tenant Kubernetes production installations. This project assumes that users that can create Ingress objects are administrators of the cluster. See the [FAQ](https://kubernetes.github.io/ingress-nginx/faq/#faq) for more.
+ * We dropped almost all of the GitHub Actions, keeping only one that rebuilds the NGINX base container and the controller container.  We are not intending to maintain this package as a going concern.
+ * We updated the GitHub Actions to their current (June 5, 2026) major versions and let them float within that major version.
+ * We dropped 32-bit ARM support, leaving only amd64 and arm64 architectures.  Nothing in the Rubin environment that runs Kubernetes will ever need 32-bit ARM.
+ * We added instructions for updating to a new version of NGINX, which is the only maintenance action we ever intend to take.
+ * We dropped the patch to nginx that had already been addressed upstream.
+ * The `log_escape_non_ascii` patch needed rework to fit an updated source file.
+ * Note that the controller name is now `ingress-nginx-controller`, not simply `controller`.  That's because `lsst-sqre` supplies other controllers (such as [Nublado](https://nublado.lsst.io)).  You will need to be aware of this when updating your helm charts.
 
-## Troubleshooting
+## How to update NGINX (instructions for Rubin DM SQuaRE)
 
-If you encounter issues, review the [troubleshooting docs](docs/troubleshooting.md),
-[search for an issue](https://github.com/kubernetes/ingress-nginx/issues), or talk to us on the
-[#ingress-nginx-users channel](https://kubernetes.slack.com/messages/ingress-nginx-users) on the Kubernetes Slack server.
+We're probably going to have to do this again before we've moved away from ingress-nginx.
+Here's the process for updating the underlying NGINX version.
 
-## Changelog
+If you're doing this for some other project, you will need to read on past this section as well.
 
-See [the list of releases](https://github.com/kubernetes/ingress-nginx/releases) for all changes.
-For detailed changes for each release, please check the [changelog-$version.md](./changelog) file for the release version.
-For detailed changes on the `ingress-nginx` helm chart, please check the changelog folder for a specific version.
-[CHANGELOG-$current-version.md](./charts/ingress-nginx/changelog) file.
+### Choose your version
 
-### Supported Versions table
+Decide on a version.
+Go to https://nginx.org/download and pick the version you want.
+Once you've done that, you should get its sha256sum.
+Do something like the following:
 
-Supported versions for the ingress-nginx project mean that we have completed E2E tests, and they are passing for
-the versions listed. Ingress-Nginx versions **may** work on older versions, but the project does not make that guarantee.
+```bash
+NGINX_VERSION=1.30.4
+wget https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz
+sha256sum nginx-$NGINX_VERSION.tar.gz | awk '{print $1}'
+```
 
-| Supported | Ingress-NGINX version | k8s supported version         | Alpine Version | Nginx Version | Helm Chart Version |
-| :-------: | --------------------- | ----------------------------- | -------------- | ------------- | ------------------ |
-|    🔄     | **v1.15.1**           | 1.35, 1.34, 1.33, 1.32, 1.31  | 3.23.3         | 1.27.1        | 4.15.1             |
-|    🔄     | **v1.15.0**           | 1.35, 1.34, 1.33, 1.32, 1.31  | 3.23.3         | 1.27.1        | 4.15.0             |
-|    🔄     | **v1.14.5**           | 1.34, 1.33, 1.32, 1.31, 1.30  | 3.23.3         | 1.27.1        | 4.14.5             |
-|    🔄     | **v1.14.4**           | 1.34, 1.33, 1.32, 1.31, 1.30  | 3.23.3         | 1.27.1        | 4.14.4             |
-|    🔄     | **v1.14.3**           | 1.34, 1.33, 1.32, 1.31, 1.30  | 3.23.2         | 1.27.1        | 4.14.3             |
-|    🔄     | **v1.14.2**           | 1.34, 1.33, 1.32, 1.31, 1.30  | 3.23.2         | 1.27.1        | 4.14.2             |
-|    🔄     | **v1.14.1**           | 1.34, 1.33, 1.32, 1.31, 1.30  | 3.22.2         | 1.27.1        | 4.14.1             |
-|    🔄     | **v1.14.0**           | 1.34, 1.33, 1.32, 1.31, 1.30  | 3.22.2         | 1.27.1        | 4.14.0             |
-|    🔄     | **v1.13.9**           | 1.33, 1.32, 1.31, 1.30, 1.29  | 3.23.3         | 1.27.1        | 4.13.9             |
-|    🔄     | **v1.13.8**           | 1.33, 1.32, 1.31, 1.30, 1.29  | 3.23.3         | 1.27.1        | 4.13.8             |
-|    🔄     | **v1.13.7**           | 1.33, 1.32, 1.31, 1.30, 1.29  | 3.23.2         | 1.27.1        | 4.13.7             |
-|    🔄     | **v1.13.6**           | 1.33, 1.32, 1.31, 1.30, 1.29  | 3.23.2         | 1.27.1        | 4.13.6             |
-|    🔄     | **v1.13.5**           | 1.33, 1.32, 1.31, 1.30, 1.29  | 3.22.2         | 1.27.1        | 4.13.5             |
-|    🔄     | **v1.13.4**           | 1.33, 1.32, 1.31, 1.30, 1.29  | 3.22.2         | 1.27.1        | 4.13.4             |
-|    🔄     | **v1.13.3**           | 1.33, 1.32, 1.31, 1.30, 1.29  | 3.22.1         | 1.27.1        | 4.13.3             |
-|    🔄     | **v1.13.2**           | 1.33, 1.32, 1.31, 1.30, 1.29  | 3.22.1         | 1.27.1        | 4.13.2             |
-|    🔄     | **v1.13.1**           | 1.33, 1.32, 1.31, 1.30, 1.29  | 3.22.1         | 1.27.1        | 4.13.1             |
-|    🔄     | **v1.13.0**           | 1.33, 1.32, 1.31, 1.30, 1.29  | 3.22.0         | 1.27.1        | 4.13.0             |
-|           | v1.12.8               | 1.32, 1.31, 1.30, 1.29, 1.28  | 3.22.2         | 1.25.5        | 4.12.8             |
-|           | v1.12.7               | 1.32, 1.31, 1.30, 1.29, 1.28  | 3.22.1         | 1.25.5        | 4.12.7             |
-|           | v1.12.6               | 1.32, 1.31, 1.30, 1.29, 1.28  | 3.22.1         | 1.25.5        | 4.12.6             |
-|           | v1.12.5               | 1.32, 1.31, 1.30, 1.29, 1.28  | 3.22.1         | 1.25.5        | 4.12.5             |
-|           | v1.12.4               | 1.32, 1.31, 1.30, 1.29, 1.28  | 3.22.0         | 1.25.5        | 4.12.4             |
-|           | v1.12.3               | 1.32, 1.31, 1.30, 1.29, 1.28  | 3.21.3         | 1.25.5        | 4.12.3             |
-|           | v1.12.2               | 1.32, 1.31, 1.30, 1.29, 1.28  | 3.21.3         | 1.25.5        | 4.12.2             |
-|           | v1.12.1               | 1.32, 1.31, 1.30, 1.29, 1.28  | 3.21.3         | 1.25.5        | 4.12.1             |
-|           | v1.12.0               | 1.32, 1.31, 1.30, 1.29, 1.28  | 3.21.0         | 1.25.5        | 4.12.0             |
-|           | v1.12.0-beta.0        | 1.32, 1.31, 1.30, 1.29, 1.28  | 3.20.3         | 1.25.5        | 4.12.0-beta.0      |
-|           | v1.11.8               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.22.0         | 1.25.5        | 4.11.8             |
-|           | v1.11.7               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.21.3         | 1.25.5        | 4.11.7             |
-|           | v1.11.6               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.21.3         | 1.25.5        | 4.11.6             |
-|           | v1.11.5               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.21.3         | 1.25.5        | 4.11.5             |
-|           | v1.11.4               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.21.0         | 1.25.5        | 4.11.4             |
-|           | v1.11.3               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.20.3         | 1.25.5        | 4.11.3             |
-|           | v1.11.2               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.20.0         | 1.25.5        | 4.11.2             |
-|           | v1.11.1               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.20.0         | 1.25.5        | 4.11.1             |
-|           | v1.11.0               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.20.0         | 1.25.5        | 4.11.0             |
-|           | v1.10.6               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.21.0         | 1.25.5        | 4.10.6             |
-|           | v1.10.5               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.20.3         | 1.25.5        | 4.10.5             |
-|           | v1.10.4               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.20.0         | 1.25.5        | 4.10.4             |
-|           | v1.10.3               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.20.0         | 1.25.5        | 4.10.3             |
-|           | v1.10.2               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.20.0         | 1.25.5        | 4.10.2             |
-|           | v1.10.1               | 1.30, 1.29, 1.28, 1.27, 1.26  | 3.19.1         | 1.25.3        | 4.10.1             |
-|           | v1.10.0               | 1.29, 1.28, 1.27, 1.26        | 3.19.1         | 1.25.3        | 4.10.0             |
-|           | v1.9.6                | 1.29, 1.28, 1.27, 1.26, 1.25  | 3.19.0         | 1.21.6        | 4.9.1              |
-|           | v1.9.5                | 1.28, 1.27, 1.26, 1.25        | 3.18.4         | 1.21.6        | 4.9.0              |
-|           | v1.9.4                | 1.28, 1.27, 1.26, 1.25        | 3.18.4         | 1.21.6        | 4.8.3              |
-|           | v1.9.3                | 1.28, 1.27, 1.26, 1.25        | 3.18.4         | 1.21.6        | 4.8.*              |
-|           | v1.9.1                | 1.28, 1.27, 1.26, 1.25        | 3.18.4         | 1.21.6        | 4.8.*              |
-|           | v1.9.0                | 1.28, 1.27, 1.26, 1.25        | 3.18.2         | 1.21.6        | 4.8.*              |
-|           | v1.8.4                | 1.27, 1.26, 1.25, 1.24        | 3.18.2         | 1.21.6        | 4.7.*              |
-|           | v1.7.1                | 1.27, 1.26, 1.25, 1.24        | 3.17.2         | 1.21.6        | 4.6.*              |
-|           | v1.6.4                | 1.26, 1.25, 1.24, 1.23        | 3.17.0         | 1.21.6        | 4.5.*              |
-|           | v1.5.1                | 1.25, 1.24, 1.23              | 3.16.2         | 1.21.6        | 4.4.*              |
-|           | v1.4.0                | 1.25, 1.24, 1.23, 1.22        | 3.16.2         | 1.19.10†      | 4.3.0              |
-|           | v1.3.1                | 1.24, 1.23, 1.22, 1.21, 1.20  | 3.16.2         | 1.19.10†      | 4.2.5              |
+### Get your patch set working
 
-See [Updating NGINX-Ingress to use the stable Ingress API (July 26, 2021)](https://kubernetes.io/blog/2021/07/26/update-with-ingress-nginx/)
-to upgrade to the stable Ingress API before upgrading to Kubernetes 1.22.
+#### Set up an environment
 
-## License
+You probably want to do this on Linux rather than MacOS, or, God forbid, Windows.
+An EC2 instance is a quick and easy way to get a very basic Linux machine going.
+Note that `quilt` is not available for EC2 Linux; I used a Debian image instead.
 
-[Apache License 2.0](https://github.com/kubernetes/ingress-nginx/blob/main/LICENSE)
+#### Set up quilt, sources, and patches
+
+First, acquire quilt; it is very probably in whatever package manager you're using.
+
+Second, grab a fresh copy of NGINX from [https://nginx.org/downloads](https://nginx.org/downloads).
+
+Unpack the vanilla NGINX sources.
+
+Copy the `patches` subdirectory from [images/nginx/rootfs/patches](images/nginx/rootfs/patches) into the top-level NGINX source directory.
+
+#### Try patching, in dry-run mode
+
+Change directory into the top-level NGINX source directory.
+Try applying patches:
+
+```bash
+for p in patches/*; do echo "*** ${p} ***"; patch --dry-run -p1 < ${p}; done
+```
+
+Ignore anything that patches with a fuzz offset; that is fine and we will get to it in the next step.
+What you are concerned with are patches that are rejected.
+
+For each of these, see what went wrong.
+The best case is that it's a patch that has already been incorporated upstream, in which case you can just delete it.
+Otherwise, you're going to have to put in some work to determine why it failed and how to make it work.
+
+A common case is that a later patch depends on an earlier patch; in that case you may need to make a working copy of the repository, and actually apply the patches in sequence to be able to tell what works and what does not.
+
+Eventually, you will either have removed all patches that failed to apply, or gotten them to apply, possibly with fuzz.
+
+Now it's time to rebase the patch set to eliminate the fuzz.
+
+#### Rebase the patch set
+
+Create a series file from the existing patches: `cd patches && quilt import *`.
+
+Now do the rebase:
+
+```bash
+quilt pop -a
+while quilt push; do quilt refresh -p ab; done
+```
+
+This will create (assuming that the patches all applied, which they should have if you did the iterative process above) modified patch files, and backup patch files with `~` extensions.
+
+
+#### Tidy up
+
+Remove all your backup files and the quilt series file: `rm series *~`
+
+Rename the patches so they have the current NGINX version.
+For instance if you are moving from version 1.30.2 to 1.30.4, do:
+```bash
+OLD=1.30.2
+NEW=1.30.4
+for p in $(ls *-${OLD}-*.patch); do n=$(echo $p | sed -e "s/${OLD}/${NEW}/"); mv ${p} ${n}; done
+```
+
+#### Test patch application
+
+Make sure all patches apply cleanly.
+Unpack the vanilla NGINX tarball somewhere new, cd to it, and copy your patch directory over to it.
+Then apply all the patches.
+```bash
+mkdir path-to-test-nginx
+cd path-to-test-nginx
+tar xvpfz path-to-tarball.tgz
+cd nginx-${NEW}
+cp -a path-to-patching-nginx/patches .
+for p in patches/*.patch; do patch -p1 < ${p}; done
+```
+
+This should apply cleanly.  If it does, move on to updating the patches in the ingress-nginx git repository.  If not, work on the patch set until it does.
+
+#### Update patches in ingress-nginx
+
+Make a new branch of this repository (if you're part of DM SQuaRE, presumably `tickets-DM/something` or `t/DM-something`).
+
+Go back to [images/nginx/rootfs](images/nginx/rootfs) and remove the extant patchset: `git rm -rf patches`.
+
+Copy the rebased patches into place and add them to git: `cp -a path-to-nginx-src/patches . && git add patches`.
+
+Commit the changes: `git commit -m "Rebase patch set"`
+
+Now it's time to fix up the rest of the build process.
+
+### Update files
+
+Edit [images/nginx/rootfs/build.sh](images/nginx/rootfs/build.sh).
+Change `NGINX_VERSION` on line 21 to the version you selected.
+Then change the checksum for the NGINX package on line 192 (which starts with `get_src`) to the checksum you just extracted.
+
+Increment the version numbers of the containers.
+[TAG](TAG) holds the controller tag, and [images/nginx/TAG](images/nginx/TAG) holds the NGINX base container tag.
+Keep the `-devsquare` label that's appended to the tag.
+
+Change [NGINX_BASE](NGINX_BASE) to pull the base image with the new base container tag.
+
+Update [Changelog.md](Changelog.md) to note the NGINX upgrade.
+
+Commit and push your changes, then open a pull request.
+
+### Let the build run
+
+GitHub Actions will do the base container build and the controller build.
+It takes about two hours to rebuild the base container.
+The controller is very quick after the base container is done.
+
+### After the build
+
+When everything is finished, `ghcr.io/lsst-sqre/nginx:NGINX_TAG` and `ghcr.io/lsst-sqre/ingress-nginx-controller:CONTROLLER_TAG` should both exist, and you can update [Phalanx](https://phalanx.lsst.io) to use the new controller container image.
+
+### Git tidying
+
+Merge your PR, and then create and push a git tag with the new value in [TAG](tag).
+
+## How to update if you're not Rubin DM SQuaRE
+
+You have to do all the steps above, but also you're going to need to change `ghcr.io/lsst-sqre` to whatever your container registry is.
+
+[.github/workflows/build.yaml](.github/workflows/build.yaml) contains two instances of the `REGISTRY` env key with that value.  Also, if you're not using `ghcr.io`, you'll need to change the authentication information in three places, one for each `Login to GitHub Container Registry` step.
+
+Then you'll need to change the `REGISTRY` definitions in [images/nginx/Makefile](images/nginx/Makefile) and [Makefile](Makefile).
+
+The tags in [TAG](TAG), [images/nginx/TAG](images/nginx/TAG), and [NGINX_BASE](NGINX_BASE) should also probably get a label that is something other than `-devsquare`; likewise for your [Changelog.md](Changelog.md) entry.
+
+## Conclusion
+
+This kicks the can down the road a little farther.
+It's currently August 13, 2026.
+Let's see how long it takes us to move away from ingress-nginx entirely.
