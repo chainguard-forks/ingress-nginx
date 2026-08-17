@@ -1,0 +1,217 @@
+name: Build Controller Containers
+# An NGINX base run takes a couple hours, so cancel a running workflow
+# if one is in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - "*"
+  # No on: push: branches: [main] -- the tagged images will be rebuilt
+  # and tested during the PR iteration process.  The merge is mostly
+  # ceremonial and just sets the baseline for the next PR.
+
+# The idea here is to rebuild the base container (the slow and costly
+# part) if there are changes to it (e.g. a new NGINX version), and if
+# we rebuilt it and the ingress-nginx-controller image depends on the
+# new tag, rebuild that.
+#
+# Otherwise, if the base container already exists, we rebuild the
+# controller if there have been changes affecting it, using the
+# existing base container to do so.
+#
+# Normally, the tag in NGINX_BASE and the tag in images/nginx/TAG should
+# be the same, but there may be times when you want to build a new base
+# container but are not yet ready to rebuild the controller container.
+jobs:
+  short_circuit:
+    name: "Short circuit check"
+    env:
+      REGISTRY: ghcr.io/lsst-sqre
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    runs-on: ubuntu-latest
+    outputs:
+      base_exists: ${{ steps.base_container.outputs.exists }}
+      nginx_exists: ${{ steps.nginx.outputs.exists }}
+      tags_equal: ${{ steps.tags.outputs.tags_equal }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: base_container
+        id: base_container
+        run: |
+          set -eux -o pipefail
+          if docker pull "$(cat NGINX_BASE)" ; then
+              echo "exists=true" >> ${GITHUB_OUTPUT}
+          else
+              echo "exists=false" >> ${GITHUB_OUTPUT}
+          fi
+      - name: nginx
+        id: nginx
+        run: |
+          set -eux -o pipefail
+          if docker pull "${{ env.REGISTRY }}/nginx:$(cat images/nginx/TAG)" ; then
+              echo "exists=true" >> ${GITHUB_OUTPUT}
+          else
+              echo "exists=false" >> ${GITHUB_OUTPUT}
+          fi
+      - name: tags
+        id: tags
+        run: |
+          set -eux -o pipefail
+          basetag=$(cat NGINX_BASE | cut -d ':' -f 2-)
+          nginxtag=$(cat images/nginx/TAG)
+          if [ "${basetag}" == "${nginxtag}" ]; then
+              echo "tags_equal=true" >> ${GITHUB_OUTPUT}
+          else
+              echo "tags_equal=false" >> ${GITHUB_OUTPUT}
+          fi
+          
+  changes:
+    name: Changes
+    permissions:
+      contents: read
+      pull-requests: read
+    runs-on: ubuntu-latest
+    outputs:
+      baseimage: ${{ steps.filter.outputs.baseimage }}
+      go: ${{ steps.filter.outputs.go }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          filters: |
+            baseimage:
+              - 'NGINX_BASE'
+              - 'images/nginx/**'
+            go:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'rootfs/**/*'
+              - 'TAG'
+              - 'NGINX_BASE'
+
+  build_nginx_container:
+    name: Build NGINX base container
+    needs: [short_circuit, changes]
+    if: |
+      ((needs.changes.outputs.baseimage == 'true') || (needs.short_circuit.outputs.nginx_exists == 'false'))
+    permissions:
+      actions: write
+      contents: read
+      packages: write
+      statuses: read
+    runs-on: ubuntu-latest
+    env:
+      PLATFORMS: linux/amd64,linux/arm64
+      REGISTRY: ghcr.io/lsst-sqre
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build_nginx
+        run: |
+          set -eo pipefail
+          export TAG=$(cat images/nginx/TAG)
+          cd images/nginx/rootfs && docker buildx build --platform=${{ env.PLATFORMS }} --push -t ${{ env.REGISTRY }}/nginx:${TAG} .
+
+  build_dependent_controller_container:
+    name: Build ingress-nginx controller (after NGINX base)
+    needs: [build_nginx_container, short_circuit]
+    if: needs.short_circuit.outputs.tags_equal == 'true'
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: "ghcr.io/lsst-sqre"
+    permissions:
+      actions: write
+      contents: write
+      packages: write
+      statuses: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # No need to set up golang: the make process does that for us.
+      - name: build-controller
+        run: |
+          echo "building controller images $(cat TAG)..."
+          make release
+
+  build_independent_controller_container:
+    name: Build ingress-nginx controller (only)
+    needs: [short_circuit, changes]
+    if: |
+      ((needs.changes.outputs.go == 'true') && (needs.short_circuit.outputs.base_exists == 'true') && (needs.short_circuit.outputs.nginx_exists == 'true'))
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: "ghcr.io/lsst-sqre"
+    permissions:
+      actions: write
+      contents: write
+      packages: write
+      statuses: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # No need to set up golang: the make process does that for us.
+      - name: build-controller
+        run: |
+          echo "building controller images $(cat TAG)..."
+          make release
