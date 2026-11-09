@@ -1,5 +1,30 @@
 NGINX base image
 
+### Tests for the patched nginx
+
+`tests/` runs nginx's own test suite, [nginx-tests](https://github.com/nginx/nginx-tests), against nginx built from the source and patch stack in `rootfs/`.
+The nginx version, its sha256, the patch loop and the core configure flags are read from `rootfs/build.sh`, so the tests follow the base image.
+The test binary leaves out the third-party modules and is built with AddressSanitizer, so a test file also fails when the sanitizer reports a memory error.
+CI runs the suite on every pull request that touches `images/nginx/`.
+
+Run it locally with Docker:
+
+```console
+make -C images/nginx test                                    # whole suite, patched nginx
+make -C images/nginx test TESTS="proxy.t t/harness.t"        # selected files, verbose
+make -C images/nginx test NGINX_TESTS_FLAVOR=pristine TESTS=proxy.t    # stock nginx, no patches
+```
+
+`rootfs/patches/00_drop-alias-root.patch` removes the `root` and `alias` directives, but Test::Nginx puts `root` into every HTTP test configuration.
+For a binary without `root`, `tests/nginx-tests-no-root.patch` makes Test::Nginx leave that line out and serve the test directory as the default root.
+Upstream files whose own configuration uses `root` or `alias` are skipped on the patched build, and `tests/skip.txt` lists any other skipped files and why.
+A file that fails is re-run once, verbosely, and the run fails only if it fails again.
+Test::Nginx settings such as `TEST_NGINX_CATLOG=1` can be passed with `docker run -e` on the `nginx-tests:<TAG>-<flavor>` image.
+
+To add a regression test for a backported fix, add a Test::Nginx script to `tests/t/` (`tests/t/harness.t` is a minimal example).
+The pull request should show the test failing with `NGINX_TESTS_FLAVOR=pristine` and passing on the patched build.
+The upstream suite is pinned by commit and sha256 in `tests/Dockerfile`; update both together.
+
 ### HTTP/3 Support
 
 **HTTP/3 support is experimental and under development**
