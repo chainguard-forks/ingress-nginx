@@ -43,6 +43,28 @@ push: build
 		--tag $(IMAGE):$(TAG) \
 		--push
 
+# Tests for the patched nginx (tests/Dockerfile, README.md): the pinned
+# nginx-tests suite plus tests/t, against nginx built with AddressSanitizer.
+# NGINX_TESTS_FLAVOR=pristine builds stock nginx without the patch stack.
+# TESTS selects files and runs them verbosely, e.g. TESTS="proxy.t t/harness.t".
+NGINX_TESTS_FLAVOR ?= patched
+NGINX_TESTS_IMAGE ?= nginx-tests:$(TAG)-$(NGINX_TESTS_FLAVOR)
+TESTS ?=
+
+.PHONY: test-image
+test-image:
+	docker build \
+		--file tests/Dockerfile \
+		--build-arg FLAVOR=$(NGINX_TESTS_FLAVOR) \
+		--tag $(NGINX_TESTS_IMAGE) \
+		.
+
+.PHONY: test
+test: test-image
+	docker run --rm \
+		--sysctl net.ipv6.conf.all.disable_ipv6=0 \
+		$(NGINX_TESTS_IMAGE) $(TESTS)
+
 .PHONY: clean
 clean:
 	docker buildx rm $(BUILDER) || :
