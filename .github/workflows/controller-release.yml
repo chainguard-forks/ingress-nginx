@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: '0 0 * * 1' # every Monday at 00:00 UTC
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Release even if nothing that ships changed since the last release'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Only report whether a release is needed and its tag; create nothing'
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -59,6 +68,7 @@ jobs:
         id: check
         env:
           GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          FORCE: ${{ inputs.force }}
         run: |
           git fetch --tags
           TAG=$(git tag --points-at HEAD)
@@ -68,17 +78,27 @@ jobs:
             # Get the last release tag (controller-v* pattern)
             LAST_TAG=$(git tag --list 'controller-v*' --sort=-v:refname | head -1)
 
-            if [ -n "$LAST_TAG" ]; then
+            if [ "$FORCE" == "true" ]; then
+              echo "Release forced with the force input."
+              echo "need_release=yes" >> $GITHUB_OUTPUT
+            elif [ -n "$LAST_TAG" ]; then
               echo "Last release tag: $LAST_TAG"
 
               # Get all changed files since last tag
               CHANGED_FILES=$(git diff --name-only "$LAST_TAG"..HEAD)
 
-              # Only release if changes include .go files, go.mod, or go.sum
-              RELEASE_WORTHY_CHANGES=$(echo "$CHANGED_FILES" | grep -E '(\.go$|^go\.mod$|^go\.sum$)' || true)
+              # Only release if something that ends up in the packages built
+              # from a release tag changed: Go code, the go.mod and go.sum of
+              # the shipped modules (root, kube-webhook-certgen and
+              # custom-error-pages), the nginx patch stack, the controller's
+              # /etc/nginx files and the custom error pages. build.sh and
+              # images/nginx/TAG are not built from; use the force input
+              # to release a change to them.
+              SHIPPED_PATHS='\.go$|^go\.(mod|sum)$|^images/(kube-webhook-certgen|custom-error-pages)/rootfs/go\.(mod|sum)$|^images/nginx/rootfs/patches/|^rootfs/etc/nginx/|^images/custom-error-pages/rootfs/(www|etc)/'
+              RELEASE_WORTHY_CHANGES=$(echo "$CHANGED_FILES" | grep -E "$SHIPPED_PATHS" || true)
 
               if [ -z "$RELEASE_WORTHY_CHANGES" ]; then
-                echo "No Go source files, go.mod, or go.sum changed since last release. Skipping release."
+                echo "Nothing that ships changed since last release. Skipping release."
                 echo "need_release=no" >> $GITHUB_OUTPUT
               else
                 echo "Found release-worthy changes since last release:"
@@ -127,8 +147,15 @@ jobs:
           echo "Bumping version: controller-v${VERSION} -> ${NEW_TAG}"
           echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
 
+      - name: Report what a dry run would release
+        if: steps.check.outputs.need_release == 'yes' && inputs.dry_run == true
+        env:
+          NEW_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          echo "Dry run: would create release $NEW_TAG at $(git rev-parse HEAD). Nothing was created."
+
       - name: Create GitHub release
-        if: steps.check.outputs.need_release == 'yes'
+        if: steps.check.outputs.need_release == 'yes' && inputs.dry_run != true
         env:
           GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
         run: |
