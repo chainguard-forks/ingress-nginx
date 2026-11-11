@@ -22,18 +22,20 @@ FROM ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce
 
 # libpcre3: build.sh and the shipped packages link PCRE1, not PCRE2.
 # The Perl modules and memcached are what the suite needs to run its SSL,
-# HTTP/3, FastCGI and memcached tests instead of skipping them.
+# HTTP/3, FastCGI, memcached and WebSocket tests instead of skipping them.
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     build-essential \
     ca-certificates \
     curl \
+    libcache-memcached-fast-perl \
     libcache-memcached-perl \
     libcryptx-perl \
     libfcgi-perl \
     libio-socket-ssl-perl \
     libnet-ssleay-perl \
     libpcre3-dev \
+    libprotocol-websocket-perl \
     libssl-dev \
     memcached \
     openssl \
