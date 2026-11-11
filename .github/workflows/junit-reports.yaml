@@ -6,13 +6,13 @@ on:
     types:
       - completed
 
+# No scopes: the reporter writes the job summary (use-actions-summary), and
+# reading this public repository's artifacts needs none.
 permissions: {}
 
 jobs:
   report:
     runs-on: ubuntu-latest
-    permissions:
-      checks: write # for dorny/test-reporter to create the report check runs
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
@@ -22,7 +22,8 @@ jobs:
       - uses: dorny/test-reporter@3d76b34a4535afbd0600d347b09a6ee5deb3ed7f # v2.6.0
         with:
           artifact: /e2e-test-reports-(.*)/
-          name: JEST Tests $1               # Name of the check run which will be created
+          name: JEST Tests $1               # One report per artifact; $1 is the suffix after e2e-test-reports-
           path: 'report*.xml'               # Path to test results (inside artifact .zip)
           reporter: jest-junit              # Format of test results
           fail-on-empty: 'true'
+          use-actions-summary: 'true'       # Job summary instead of check runs, so no checks scope
