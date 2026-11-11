@@ -241,8 +241,9 @@ jobs:
     name: NGINX / Tests
     runs-on: ubuntu-latest
     needs: changes
-    if: |
-      (needs.changes.outputs.baseimage == 'true') || ${{ github.event.workflow_dispatch.run_e2e == 'true' }}
+    # A plain expression on purpose: an if: that mixes text with ${{ }} is a
+    # non-empty string, which is always true.
+    if: needs.changes.outputs.baseimage == 'true' || inputs.run_e2e
     timeout-minutes: 60
 
     steps:
