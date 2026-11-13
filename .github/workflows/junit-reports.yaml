@@ -19,7 +19,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: dorny/test-reporter@3d76b34a4535afbd0600d347b09a6ee5deb3ed7f # v2.6.0
+      - uses: dorny/test-reporter@d1b5dff021aa968b288b02285a8bf47471c5928a # v3.2.0
         with:
           artifact: /e2e-test-reports-(.*)/
           name: JEST Tests $1               # One report per artifact; $1 is the suffix after e2e-test-reports-
