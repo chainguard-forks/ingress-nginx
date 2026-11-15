@@ -49,14 +49,17 @@ func (s *streamServicesStore) GetServiceEndpointsSlices(_ string) ([]*discoveryv
 	return s.slices, nil
 }
 
-// overflowingPortName is a valid Service port name whose leading digits,
-// read as a number, do not fit in an int32.
-const overflowingPortName = "4294967296a"
+// Service port names used by the tests in this file. overflowingPortName is
+// a valid name whose leading digits, read as a number, do not fit in an int32.
+const (
+	namedPortName       = "http"
+	overflowingPortName = "4294967296a"
+)
 
 func TestGetStreamServicesPortNumbers(t *testing.T) {
 	for _, proto := range []corev1.Protocol{corev1.ProtocolTCP, corev1.ProtocolUDP} {
 		t.Run(string(proto), func(t *testing.T) {
-			httpName, numericName, letterName := "http", "65536", overflowingPortName
+			httpName, numericName, letterName := namedPortName, "65536", overflowingPortName
 			httpPort, numericPort, letterPort := int32(8080), int32(8443), int32(8444)
 			ready := true
 
@@ -121,7 +124,7 @@ func TestExternalNamePorts(t *testing.T) {
 			Type:         corev1.ServiceTypeExternalName,
 			ExternalName: "external.example",
 			Ports: []corev1.ServicePort{
-				{Name: "http", Port: 80, TargetPort: intstr.FromInt32(8080)},
+				{Name: namedPortName, Port: 80, TargetPort: intstr.FromInt32(8080)},
 				{Name: "65536", Port: 443, TargetPort: intstr.FromInt32(8443)},
 				{Name: overflowingPortName, Port: 444, TargetPort: intstr.FromInt32(8444)},
 			},
@@ -134,7 +137,7 @@ func TestExternalNamePorts(t *testing.T) {
 		targetPort intstr.IntOrString
 	}{
 		{"80", 80, intstr.FromInt32(8080)},
-		{"http", 80, intstr.FromInt32(8080)},
+		{namedPortName, 80, intstr.FromInt32(8080)},
 		// A number that matches no Service port is used as it is.
 		{"8000", 8000, intstr.FromInt32(8000)},
 		// A name that matches no Service port gives port 0.
