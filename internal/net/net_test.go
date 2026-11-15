@@ -61,30 +61,33 @@ func TestIsPortAvailable(t *testing.T) {
 
 func TestParsePort(t *testing.T) {
 	tests := []struct {
-		in   string
-		port int32
-		ok   bool
+		in       string
+		port     int32
+		isNumber bool
+		valid    bool
 	}{
-		{"1", 1, true},
-		{"80", 80, true},
-		{"+80", 80, true},
-		{"080", 80, true},
-		{"65535", 65535, true},
-		{"0", 0, false},
-		{"-1", 0, false},
-		{"65536", 0, false},
+		{"1", 1, true, true},
+		{"80", 80, true, true},
+		{"+80", 80, true, true},
+		{"080", 80, true, true},
+		{"65535", 65535, true, true},
+		{"0", 0, true, false},
+		{"-1", 0, true, false},
+		{"65536", 0, true, false},
 		// 2^32 + 80: a conversion from a 64-bit int to int32 would give 80.
-		{"4294967376", 0, false},
-		{"http", 0, false},
-		{"8080a", 0, false},
-		{" 80", 0, false},
-		{"", 0, false},
+		{"4294967376", 0, true, false},
+		{"99999999999999999999", 0, true, false},
+		{"http", 0, false, false},
+		{"8080a", 0, false, false},
+		{" 80", 0, false, false},
+		{"", 0, false, false},
 	}
 
 	for _, tt := range tests {
-		port, ok := ParsePort(tt.in)
-		if port != tt.port || ok != tt.ok {
-			t.Errorf("ParsePort(%q) = %d, %v; want %d, %v", tt.in, port, ok, tt.port, tt.ok)
+		port, isNumber, valid := ParsePort(tt.in)
+		if port != tt.port || isNumber != tt.isNumber || valid != tt.valid {
+			t.Errorf("ParsePort(%q) = %d, %v, %v; want %d, %v, %v",
+				tt.in, port, isNumber, valid, tt.port, tt.isNumber, tt.valid)
 		}
 	}
 }

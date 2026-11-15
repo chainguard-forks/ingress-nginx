@@ -536,7 +536,11 @@ func (n *NGINXController) getStreamServices(configmapName string, proto apiv1.Pr
 			continue
 		}
 		var endps []ingress.Endpoint
-		targetPort, isPortNumber := ing_net.ParsePort(svcPort)
+		targetPort, isPortNumber, validPort := ing_net.ParsePort(svcPort)
+		if isPortNumber && !validPort {
+			klog.Warningf("%q is not a valid %v port number for Service %q", svcPort, proto, nsName)
+			continue
+		}
 		var zone string
 		if n.cfg.EnableTopologyAwareRouting {
 			zone = getIngressPodZone(svc)
@@ -1770,7 +1774,9 @@ func shouldCreateUpstreamForLocationDefaultBackend(upstream *ingress.Backend, lo
 }
 
 func externalNamePorts(name string, svc *apiv1.Service) *apiv1.ServicePort {
-	port, isPortNumber := ing_net.ParsePort(name)
+	// A number outside 1-65535 is not looked up as a port name: it gives
+	// port 0, as a name that matches no port does.
+	port, isPortNumber, _ := ing_net.ParsePort(name)
 	if !isPortNumber {
 		// not a port number. check port names.
 		for _, svcPort := range svc.Spec.Ports {

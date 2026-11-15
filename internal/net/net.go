@@ -17,6 +17,7 @@ limitations under the License.
 package net
 
 import (
+	"errors"
 	"fmt"
 	_net "net"
 	"os"
@@ -24,15 +25,21 @@ import (
 	"strings"
 )
 
-// ParsePort parses s as a TCP or UDP port number: a decimal integer from 1
-// to 65535, written as strconv.Atoi accepts it. It returns false for anything
-// else, such as a port name or a number out of range.
-func ParsePort(s string) (int32, bool) {
+// ParsePort parses s as a TCP or UDP port number. isNumber reports whether s
+// is a decimal integer, written as strconv.Atoi accepts it; a string that is
+// not, such as a port name, gives false. valid reports whether that integer
+// is also a port number, from 1 to 65535. port is the number when valid is
+// true, and 0 otherwise.
+func ParsePort(s string) (port int32, isNumber, valid bool) {
 	p, err := strconv.ParseInt(s, 10, 32)
-	if err != nil || p < 1 || p > 65535 {
-		return 0, false
+	if err != nil {
+		// An integer too large for int32 is still a number.
+		return 0, errors.Is(err, strconv.ErrRange), false
 	}
-	return int32(p), true
+	if p < 1 || p > 65535 {
+		return 0, true, false
+	}
+	return int32(p), true, true
 }
 
 // IsIPV6 checks if the input contains a valid IPV6 address

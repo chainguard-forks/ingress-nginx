@@ -465,8 +465,9 @@ func (n *NGINXController) generateTemplate(cfg ngx_config.Configuration, ingress
 				klog.Warningf("Missing Service for SSL Passthrough backend %q", pb.Backend)
 				continue
 			}
-			// A port number is used as it is; a port name is looked up in the Service.
-			port, isPortNumber := ing_net.ParsePort(pb.Port.String())
+			// A port number is used as it is, and one outside 1-65535 gives 0.
+			// A port name is looked up in the Service.
+			port, isPortNumber, _ := ing_net.ParsePort(pb.Port.String())
 			if !isPortNumber {
 				for _, sp := range svc.Spec.Ports {
 					if sp.Name == pb.Port.String() {
