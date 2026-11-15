@@ -221,7 +221,7 @@ func BuildRedirects(servers []*ingress.Server) []*Redirect {
 			if ssl.IsValidHostname(from, srv.SSLCert.CN) {
 				r.SSLCert = srv.SSLCert
 			} else {
-				klog.Warningf("the server %v has SSL configured but the SSL certificate does not contains a CN for %v. Redirects will not work for HTTPS to HTTPS", from, to)
+				klog.Warningf("the server %q has SSL configured but the SSL certificate does not contains a CN for %q. Redirects will not work for HTTPS to HTTPS", from, to)
 			}
 		}
 

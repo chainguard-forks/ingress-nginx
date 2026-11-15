@@ -37,3 +37,13 @@ func TestSSLCertTracker(t *testing.T) {
 		t.Errorf("expected an item from the store but none returned")
 	}
 }
+
+func TestSSLCertTrackerByKeyQuotesKey(t *testing.T) {
+	_, err := NewSSLCertTracker().ByKey("default/tls\nFORGED")
+	if err == nil {
+		t.Fatal("expected an error for a key that is not in the store")
+	}
+	if want := `local SSL certificate "default/tls\nFORGED" was not found`; err.Error() != want {
+		t.Errorf("ByKey error = %q; want %q", err.Error(), want)
+	}
+}

@@ -40,7 +40,7 @@ func NewSSLCertTracker() *SSLCertTracker {
 func (s SSLCertTracker) ByKey(key string) (*ingress.SSLCert, error) {
 	cert, exists := s.Get(key)
 	if !exists {
-		return nil, fmt.Errorf("local SSL certificate %v was not found", key)
+		return nil, fmt.Errorf("local SSL certificate %q was not found", key)
 	}
 	return cert.(*ingress.SSLCert), nil
 }
