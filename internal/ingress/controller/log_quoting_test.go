@@ -58,6 +58,13 @@ func checkEscaped(t *testing.T, out string, want ...string) {
 	}
 }
 
+// Names used by the tests in this file.
+const (
+	quoteTestNamespace = "quote-test"
+	quoteTestHost      = "quote.example"
+	quoteTestUpstream  = "quote-test-quote-svc-80"
+)
+
 // noClassStore reports that no Ingress belongs to this controller's class.
 type noClassStore struct {
 	fakeIngressStore
@@ -71,7 +78,7 @@ func (noClassStore) GetIngressClass(_ *networking.Ingress, _ *ingressclass.Confi
 // request, which a caller of the webhook controls.
 func TestCheckIngressQuotesLogValues(t *testing.T) {
 	ing := &networking.Ingress{
-		ObjectMeta: metav1.ObjectMeta{Name: "x\nFORGED", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "x\nFORGED", Namespace: quoteTestNamespace},
 	}
 
 	t.Run("another ingress class", func(t *testing.T) {
@@ -81,7 +88,7 @@ func TestCheckIngressQuotesLogValues(t *testing.T) {
 				t.Errorf("CheckIngress returned %v; want nil", err)
 			}
 		})
-		checkEscaped(t, out, `ignoring ingress "x\nFORGED" in "default"`)
+		checkEscaped(t, out, `ignoring ingress "x\nFORGED" in "quote-test"`)
 	})
 
 	t.Run("another namespace", func(t *testing.T) {
@@ -91,7 +98,7 @@ func TestCheckIngressQuotesLogValues(t *testing.T) {
 				t.Errorf("CheckIngress returned %v; want nil", err)
 			}
 		})
-		checkEscaped(t, out, `ignoring ingress "x\nFORGED" in namespace "default" different from the namespace watched watched`)
+		checkEscaped(t, out, `ignoring ingress "x\nFORGED" in namespace "quote-test" different from the namespace watched watched`)
 	})
 }
 
@@ -101,10 +108,10 @@ func TestCheckIngressQuotesLogValues(t *testing.T) {
 func TestMergeAlternativeBackendsQuotesLogValues(t *testing.T) {
 	ing := &ingress.Ingress{
 		Ingress: networking.Ingress{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "example", Name: "canary"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: quoteTestNamespace, Name: "canary"},
 			Spec: networking.IngressSpec{
 				Rules: []networking.IngressRule{{
-					Host: "example.com",
+					Host: quoteTestHost,
 					IngressRuleValue: networking.IngressRuleValue{
 						HTTP: &networking.HTTPIngressRuleValue{
 							Paths: []networking.HTTPIngressPath{{
@@ -112,7 +119,7 @@ func TestMergeAlternativeBackendsQuotesLogValues(t *testing.T) {
 								PathType: &pathTypePrefix,
 								Backend: networking.IngressBackend{
 									Service: &networking.IngressServiceBackend{
-										Name: "http-svc-canary",
+										Name: "quote-svc",
 										Port: networking.ServiceBackendPort{Number: 80},
 									},
 								},
@@ -124,16 +131,16 @@ func TestMergeAlternativeBackendsQuotesLogValues(t *testing.T) {
 		},
 	}
 	upstreams := map[string]*ingress.Backend{
-		"example-http-svc-canary-80": {Name: "example-http-svc-canary-80", NoServer: true},
+		quoteTestUpstream: {Name: quoteTestUpstream, NoServer: true},
 	}
 	servers := map[string]*ingress.Server{
-		"example.com": {
-			Hostname: "example.com",
+		quoteTestHost: {
+			Hostname: quoteTestHost,
 			Locations: []*ingress.Location{
 				// The primary backend of this location does not exist.
-				{Path: "/x\nFORGED", PathType: &pathTypePrefix, Backend: "example-missing-80"},
+				{Path: "/x\nFORGED", PathType: &pathTypePrefix, Backend: "quote-test-missing-80"},
 				// This location is served by the alternative backend itself.
-				{Path: "/y\nFORGED", PathType: &pathTypePrefix, Backend: "example-http-svc-canary-80"},
+				{Path: "/y\nFORGED", PathType: &pathTypePrefix, Backend: quoteTestUpstream},
 			},
 		},
 	}
@@ -141,7 +148,7 @@ func TestMergeAlternativeBackendsQuotesLogValues(t *testing.T) {
 	out := captureKlog(t, func() { mergeAlternativeBackends(ing, upstreams, servers) })
 
 	checkEscaped(t, out,
-		`cannot find primary backend "example-missing-80" for location "example.com/x\nFORGED"`,
-		`alternative upstream "example-http-svc-canary-80" in Ingress "example/canary" is primary upstream in Other Ingress for location "example.com/y\nFORGED"!`,
+		`cannot find primary backend "quote-test-missing-80" for location "quote.example/x\nFORGED"`,
+		`alternative upstream "quote-test-quote-svc-80" in Ingress "quote-test/canary" is primary upstream in Other Ingress for location "quote.example/y\nFORGED"!`,
 	)
 }
