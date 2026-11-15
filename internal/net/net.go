@@ -20,8 +20,34 @@ import (
 	"fmt"
 	_net "net"
 	"os"
+	"strconv"
 	"strings"
 )
+
+// ParsePort parses s as a TCP or UDP port number. isNumber reports whether s
+// is a decimal integer: an optional "+" or "-" followed by one or more ASCII
+// digits. A string that is not, such as a port name, gives false. valid
+// reports whether that integer is also a port number, from 1 to 65535. port
+// is the number when valid is true, and 0 otherwise.
+func ParsePort(s string) (port int32, isNumber, valid bool) {
+	digits := s
+	if digits != "" && (digits[0] == '+' || digits[0] == '-') {
+		digits = digits[1:]
+	}
+	// Check the whole string first: strconv reports a range error as soon as
+	// the digits overflow, before it sees a later character that is not a
+	// digit, as in "4294967296a".
+	if digits == "" || strings.Trim(digits, "0123456789") != "" {
+		return 0, false, false
+	}
+
+	// s is an integer, so the only possible error is a range error.
+	p, err := strconv.ParseInt(s, 10, 32)
+	if err != nil || p < 1 || p > 65535 {
+		return 0, true, false
+	}
+	return int32(p), true, true
+}
 
 // IsIPV6 checks if the input contains a valid IPV6 address
 func IsIPV6(ip _net.IP) bool {
