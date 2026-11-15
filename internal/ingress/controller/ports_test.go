@@ -49,10 +49,14 @@ func (s *streamServicesStore) GetServiceEndpointsSlices(_ string) ([]*discoveryv
 	return s.slices, nil
 }
 
+// overflowingPortName is a valid Service port name whose leading digits,
+// read as a number, do not fit in an int32.
+const overflowingPortName = "4294967296a"
+
 func TestGetStreamServicesPortNumbers(t *testing.T) {
 	for _, proto := range []corev1.Protocol{corev1.ProtocolTCP, corev1.ProtocolUDP} {
 		t.Run(string(proto), func(t *testing.T) {
-			httpName, numericName, letterName := "http", "65536", "4294967296a"
+			httpName, numericName, letterName := "http", "65536", overflowingPortName
 			httpPort, numericPort, letterPort := int32(8080), int32(8443), int32(8444)
 			ready := true
 
@@ -71,7 +75,7 @@ func TestGetStreamServicesPortNumbers(t *testing.T) {
 					},
 				},
 				service: &corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: "default"},
+					ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: corev1.NamespaceDefault},
 					Spec: corev1.ServiceSpec{
 						Ports: []corev1.ServicePort{
 							{Name: httpName, Port: 80, TargetPort: intstr.FromInt32(httpPort), Protocol: proto},
@@ -115,11 +119,11 @@ func TestExternalNamePorts(t *testing.T) {
 	svc := &corev1.Service{
 		Spec: corev1.ServiceSpec{
 			Type:         corev1.ServiceTypeExternalName,
-			ExternalName: "example.com",
+			ExternalName: "external.example",
 			Ports: []corev1.ServicePort{
 				{Name: "http", Port: 80, TargetPort: intstr.FromInt32(8080)},
 				{Name: "65536", Port: 443, TargetPort: intstr.FromInt32(8443)},
-				{Name: "4294967296a", Port: 444, TargetPort: intstr.FromInt32(8444)},
+				{Name: overflowingPortName, Port: 444, TargetPort: intstr.FromInt32(8444)},
 			},
 		},
 	}
@@ -140,7 +144,7 @@ func TestExternalNamePorts(t *testing.T) {
 		// A number is never looked up as a port name, even when it is not a valid port.
 		{"65536", 0, intstr.FromInt32(0)},
 		// Not a number, although its digits alone overflow int32.
-		{"4294967296a", 444, intstr.FromInt32(8444)},
+		{overflowingPortName, 444, intstr.FromInt32(8444)},
 	}
 
 	for _, tt := range tests {
