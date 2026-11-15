@@ -79,7 +79,14 @@ func TestParsePort(t *testing.T) {
 		{"99999999999999999999", 0, true, false},
 		{"http", 0, false, false},
 		{"8080a", 0, false, false},
+		// strconv.ParseInt reports a range error for these before it reaches the letter.
+		{"4294967296a", 0, false, false},
+		{"99999999999999999999a", 0, false, false},
 		{" 80", 0, false, false},
+		{"80 ", 0, false, false},
+		{"+-1", 0, false, false},
+		{"+", 0, false, false},
+		{"-", 0, false, false},
 		{"", 0, false, false},
 	}
 
