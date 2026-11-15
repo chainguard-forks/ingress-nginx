@@ -465,19 +465,12 @@ func (n *NGINXController) generateTemplate(cfg ngx_config.Configuration, ingress
 				klog.Warningf("Missing Service for SSL Passthrough backend %q", pb.Backend)
 				continue
 			}
-			port, err := strconv.Atoi(pb.Port.String()) // #nosec
-			if err != nil {
+			// A port number is used as it is; a port name is looked up in the Service.
+			port, isPortNumber := ing_net.ParsePort(pb.Port.String())
+			if !isPortNumber {
 				for _, sp := range svc.Spec.Ports {
 					if sp.Name == pb.Port.String() {
-						port = int(sp.Port)
-						break
-					}
-				}
-			} else {
-				for _, sp := range svc.Spec.Ports {
-					//nolint:gosec // Ignore G109 error
-					if sp.Port == int32(port) {
-						port = int(sp.Port)
+						port = sp.Port
 						break
 					}
 				}
@@ -487,7 +480,7 @@ func (n *NGINXController) generateTemplate(cfg ngx_config.Configuration, ingress
 			servers = append(servers, &tcpproxy.TCPServer{
 				Hostname:      pb.Hostname,
 				IP:            svc.Spec.ClusterIP,
-				Port:          port,
+				Port:          int(port),
 				ProxyProtocol: false,
 			})
 		}

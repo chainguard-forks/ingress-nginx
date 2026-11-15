@@ -20,8 +20,20 @@ import (
 	"fmt"
 	_net "net"
 	"os"
+	"strconv"
 	"strings"
 )
+
+// ParsePort parses s as a TCP or UDP port number: a decimal integer from 1
+// to 65535, written as strconv.Atoi accepts it. It returns false for anything
+// else, such as a port name or a number out of range.
+func ParsePort(s string) (int32, bool) {
+	p, err := strconv.ParseInt(s, 10, 32)
+	if err != nil || p < 1 || p > 65535 {
+		return 0, false
+	}
+	return int32(p), true
+}
 
 // IsIPV6 checks if the input contains a valid IPV6 address
 func IsIPV6(ip _net.IP) bool {

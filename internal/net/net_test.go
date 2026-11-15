@@ -58,3 +58,33 @@ func TestIsPortAvailable(t *testing.T) {
 		t.Fatalf("expected port %v to not be available", p)
 	}
 }
+
+func TestParsePort(t *testing.T) {
+	tests := []struct {
+		in   string
+		port int32
+		ok   bool
+	}{
+		{"1", 1, true},
+		{"80", 80, true},
+		{"+80", 80, true},
+		{"080", 80, true},
+		{"65535", 65535, true},
+		{"0", 0, false},
+		{"-1", 0, false},
+		{"65536", 0, false},
+		// 2^32 + 80: a conversion from a 64-bit int to int32 would give 80.
+		{"4294967376", 0, false},
+		{"http", 0, false},
+		{"8080a", 0, false},
+		{" 80", 0, false},
+		{"", 0, false},
+	}
+
+	for _, tt := range tests {
+		port, ok := ParsePort(tt.in)
+		if port != tt.port || ok != tt.ok {
+			t.Errorf("ParsePort(%q) = %d, %v; want %d, %v", tt.in, port, ok, tt.port, tt.ok)
+		}
+	}
+}
