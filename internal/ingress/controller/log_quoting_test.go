@@ -18,7 +18,7 @@ package controller
 
 import (
 	"bytes"
-	"os"
+	"errors"
 	"strings"
 	"testing"
 
@@ -26,22 +26,73 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
+	"k8s.io/ingress-nginx/internal/ingress/controller/ingressclass"
 	"k8s.io/ingress-nginx/pkg/apis/ingress"
 )
 
 // captureKlog returns what klog writes while f runs.
 func captureKlog(t *testing.T, f func()) string {
 	t.Helper()
+	state := klog.CaptureState()
+	defer state.Restore()
 	var buf bytes.Buffer
 	klog.LogToStderr(false)
 	klog.SetOutput(&buf)
-	defer func() {
-		klog.SetOutput(os.Stderr)
-		klog.LogToStderr(true)
-	}()
 	f()
 	klog.Flush()
 	return buf.String()
+}
+
+// checkEscaped reports an error unless out contains each of want, and
+// contains no newline followed by "FORGED", the marker the tests put after a
+// newline in an Ingress value.
+func checkEscaped(t *testing.T, out string, want ...string) {
+	t.Helper()
+	for _, w := range want {
+		if !strings.Contains(out, w) {
+			t.Errorf("the log does not contain %s; it is:\n%s", w, out)
+		}
+	}
+	if strings.Contains(out, "\nFORGED") {
+		t.Errorf("a newline from an Ingress value reached the log unescaped:\n%s", out)
+	}
+}
+
+// noClassStore reports that no Ingress belongs to this controller's class.
+type noClassStore struct {
+	fakeIngressStore
+}
+
+func (noClassStore) GetIngressClass(_ *networking.Ingress, _ *ingressclass.Configuration) (string, error) {
+	return "", errors.New("no matching IngressClass")
+}
+
+// The admission webhook logs the Ingress it ignores. Its name comes from the
+// request, which a caller of the webhook controls.
+func TestCheckIngressQuotesLogValues(t *testing.T) {
+	ing := &networking.Ingress{
+		ObjectMeta: metav1.ObjectMeta{Name: "x\nFORGED", Namespace: "default"},
+	}
+
+	t.Run("another ingress class", func(t *testing.T) {
+		n := &NGINXController{cfg: &Configuration{}, store: &noClassStore{}}
+		out := captureKlog(t, func() {
+			if err := n.CheckIngress(ing); err != nil {
+				t.Errorf("CheckIngress returned %v; want nil", err)
+			}
+		})
+		checkEscaped(t, out, `ignoring ingress "x\nFORGED" in "default"`)
+	})
+
+	t.Run("another namespace", func(t *testing.T) {
+		n := &NGINXController{cfg: &Configuration{Namespace: "watched"}, store: &fakeIngressStore{}}
+		out := captureKlog(t, func() {
+			if err := n.CheckIngress(ing); err != nil {
+				t.Errorf("CheckIngress returned %v; want nil", err)
+			}
+		})
+		checkEscaped(t, out, `ignoring ingress "x\nFORGED" in namespace "default" different from the namespace watched watched`)
+	})
 }
 
 // An ImplementationSpecific path can contain a newline: the API server only
@@ -89,15 +140,8 @@ func TestMergeAlternativeBackendsQuotesLogValues(t *testing.T) {
 
 	out := captureKlog(t, func() { mergeAlternativeBackends(ing, upstreams, servers) })
 
-	for _, want := range []string{
+	checkEscaped(t, out,
 		`cannot find primary backend "example-missing-80" for location "example.com/x\nFORGED"`,
 		`alternative upstream "example-http-svc-canary-80" in Ingress "example/canary" is primary upstream in Other Ingress for location "example.com/y\nFORGED"!`,
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("the log does not contain %s; it is:\n%s", want, out)
-		}
-	}
-	if strings.Contains(out, "\nFORGED") {
-		t.Errorf("a newline from a path reached the log unescaped:\n%s", out)
-	}
+	)
 }

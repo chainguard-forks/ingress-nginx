@@ -18,7 +18,6 @@ package ingress
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
 
@@ -30,13 +29,11 @@ import (
 // captureKlog returns what klog writes while f runs.
 func captureKlog(t *testing.T, f func()) string {
 	t.Helper()
+	state := klog.CaptureState()
+	defer state.Restore()
 	var buf bytes.Buffer
 	klog.LogToStderr(false)
 	klog.SetOutput(&buf)
-	defer func() {
-		klog.SetOutput(os.Stderr)
-		klog.LogToStderr(true)
-	}()
 	f()
 	klog.Flush()
 	return buf.String()
