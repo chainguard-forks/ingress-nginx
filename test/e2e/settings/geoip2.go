@@ -31,7 +31,9 @@ import (
 	"k8s.io/ingress-nginx/test/e2e/framework"
 )
 
-const testdataURL = "https://github.com/maxmind/MaxMind-DB/blob/5a0be1c0320490b8e4379dbd5295a18a648ff156/test-data/GeoLite2-Country-Test.mmdb?raw=true"
+// testdataURL is the raw file, not github.com's /blob/ page for it: the page
+// is served by GitHub's web front end, which can fail while the file host works.
+const testdataURL = "https://raw.githubusercontent.com/maxmind/MaxMind-DB/5a0be1c0320490b8e4379dbd5295a18a648ff156/test-data/GeoLite2-Country-Test.mmdb"
 
 var _ = framework.DescribeSetting("Geoip2", func() {
 	f := framework.NewDefaultFramework("geoip2")
