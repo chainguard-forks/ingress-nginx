@@ -58,6 +58,11 @@ RUN curl -fsSL -o /tmp/nginx-tests.tar.gz \
 COPY tests/nginx-tests-no-root.patch /src/tests/
 RUN patch -d /opt/nginx-tests -p1 < /src/tests/nginx-tests-no-root.patch
 
+# upstream nginx-tests cf2b5bf, needed since the CVE-2026-123640 backport;
+# drop it once NGINX_TESTS_COMMIT includes that commit
+COPY tests/nginx-tests-ssl-preread-fixture.patch /src/tests/
+RUN patch -d /opt/nginx-tests -p1 < /src/tests/nginx-tests-ssl-preread-fixture.patch
+
 COPY rootfs/build.sh /src/rootfs/build.sh
 COPY rootfs/patches /src/rootfs/patches
 COPY tests/build-nginx.sh /src/tests/build-nginx.sh

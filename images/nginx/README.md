@@ -24,6 +24,7 @@ Test::Nginx settings such as `TEST_NGINX_CATLOG=1` can be passed with `docker ru
 To add a regression test for a backported fix, add a Test::Nginx script to `tests/t/` (`tests/t/harness.t` is a minimal example).
 The pull request should show the test failing with `NGINX_TESTS_FLAVOR=pristine` and passing on the patched build.
 The upstream suite is pinned by commit and sha256 in `tests/Dockerfile`; update both together.
+`tests/nginx-tests-ssl-preread-fixture.patch` carries upstream nginx-tests commit `cf2b5bf`, which fixes a malformed ClientHello fixture that the CVE-2026-123640 backport rejects; drop it once the pin includes that commit.
 
 ### HTTP/3 Support
 

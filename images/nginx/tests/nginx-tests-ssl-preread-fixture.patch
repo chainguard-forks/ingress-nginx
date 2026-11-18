@@ -1,0 +1,28 @@
+Fix the malformed TLS 1.3 ClientHello fixture in stream_ssl_preread_protocol.t.
+
+get_tls13() declares a 7-byte supported_versions extension but carries only
+3 bytes of it.  Since 58_nginx-1.27.1-CVE-2026-123640.patch the ssl_preread
+parser rejects extensions whose length does not match their content, as
+upstream nginx does since 1.31.9 / 1.30.7, so "client hello supported_versions"
+gets no protocol and fails.  Upstream fixed the fixture together with the
+parser change; this is that commit, unchanged:
+https://github.com/nginx/nginx-tests/commit/cf2b5bf5f98f578a0a3da13c8c507c996f5f74fe
+
+The fixed ClientHello is well-formed, so the test passes on both the patched
+and the pristine build.  Drop this file once NGINX_TESTS_COMMIT in Dockerfile
+includes cf2b5bf; it was not bumped here because the pinned archive's sha256
+has to be taken from the GitHub tarball itself.
+
+diff --git a/stream_ssl_preread_protocol.t b/stream_ssl_preread_protocol.t
+index 8950577..b9e565e 100644
+--- a/stream_ssl_preread_protocol.t
++++ b/stream_ssl_preread_protocol.t
+@@ -81,7 +81,7 @@ sub get_tls13 {
+ 	$r .= pack("N*", 0x6357cdba, 0xa6b8d853, 0xf1f6ac0f);
+ 	$r .= pack("N*", 0xdf03178c, 0x0ae41824, 0xe7643682);
+ 	$r .= pack("N*", 0x3c1b273f, 0xbfde4b00, 0x00000000);
+-	$r .= pack("CNCn", 0x07, 0x002b0007, 0x02, 0x7f1c);
++	$r .= pack("CNCn", 0x07, 0x002b0003, 0x02, 0x0304);
+ 
+ 	http($r);
+ }

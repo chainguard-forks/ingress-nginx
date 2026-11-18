@@ -18,7 +18,9 @@ for the bundled NGINX release line.
 > Some of these patches add fields to core NGINX structures. For example, the
 > `max_headers` backport for CVE-2026-49975 adds a counter to
 > `ngx_http_headers_in_t`, which is embedded in `ngx_http_request_t`, so it
-> changes the binary layout of those structures relative to stock NGINX. Every
+> changes the binary layout of those structures relative to stock NGINX.
+> Likewise, the HTTP/2 flow-control backport for CVE-2026-123007 adds a
+> `send_queued` counter to `ngx_http_v2_connection_t`. Every
 > dynamic module shipped in this image is compiled against the patched headers,
 > so the image itself is self-consistent. However, a third-party NGINX dynamic
 > module built against an unpatched NGINX of the same version may be
