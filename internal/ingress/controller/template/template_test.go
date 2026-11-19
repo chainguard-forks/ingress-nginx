@@ -59,7 +59,7 @@ func TestBuildMirrorLocationsMarksRequests(t *testing.T) {
 		Mirror: mirror.Config{
 			Source: "/_mirror-test",
 			Target: "http://127.0.0.1:10246/configuration/backends",
-			Host:   "127.0.0.1",
+			Host:   "localhost",
 		},
 	}}
 
