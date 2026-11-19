@@ -57,6 +57,18 @@ describe("Configuration", function()
   end)
 
   describe("Backends", function()
+    it("rejects a mirrored request without changing the shared dictionary", function()
+      local existing_backends = cjson.encode(get_backends())
+      ngx.shared.configuration_data:set("backends", existing_backends)
+      ngx.var.http_x_ingress_nginx_mirror = "1"
+      ngx.var.request_method = "POST"
+      ngx.var.request_uri = "/configuration/backends"
+
+      assert.has_no.errors(configuration.call)
+      assert.same(ngx.HTTP_FORBIDDEN, ngx.status)
+      assert.same(existing_backends, ngx.shared.configuration_data:get("backends"))
+    end)
+
     context("Request method is neither GET nor POST", function()
       it("sends 'Only POST and GET requests are allowed!' in the response body", function()
         ngx.var.request_method = "PUT"
@@ -100,9 +112,49 @@ describe("Configuration", function()
       end)
 
       it("stores the posted backends on the shared dictionary", function()
-        -- Encoding backends since comparing tables fail due to reference comparison
         assert.has_no.errors(configuration.call)
-        assert.equal(ngx.shared.configuration_data:get("backends"), cjson.encode(get_backends()))
+        local stored_backends = cjson.decode(ngx.shared.configuration_data:get("backends"))
+        assert.same(get_backends(), stored_backends)
+      end)
+
+      it("rejects an object payload without overwriting the shared dictionary", function()
+        local existing_backends = cjson.encode(get_backends())
+        ngx.shared.configuration_data:set("backends", existing_backends)
+        ngx.req.get_body_data = function()
+          return [[{"malformed":true,"source":"invalid-payload"}]]
+        end
+
+        assert.has_no.errors(configuration.call)
+        assert.same(ngx.HTTP_BAD_REQUEST, ngx.status)
+        assert.same(existing_backends, ngx.shared.configuration_data:get("backends"))
+      end)
+
+      it("rejects an empty object without clearing the shared dictionary", function()
+        local existing_backends = cjson.encode(get_backends())
+        ngx.shared.configuration_data:set("backends", existing_backends)
+        ngx.req.get_body_data = function() return "{}" end
+
+        assert.has_no.errors(configuration.call)
+        assert.same(ngx.HTTP_BAD_REQUEST, ngx.status)
+        assert.same(existing_backends, ngx.shared.configuration_data:get("backends"))
+      end)
+
+      it("accepts and preserves an empty backend array", function()
+        ngx.req.get_body_data = function() return "[]" end
+
+        assert.has_no.errors(configuration.call)
+        assert.same(ngx.HTTP_CREATED, ngx.status)
+        assert.same("[]", ngx.shared.configuration_data:get("backends"))
+      end)
+
+      it("rejects malformed JSON without overwriting the shared dictionary", function()
+        local existing_backends = cjson.encode(get_backends())
+        ngx.shared.configuration_data:set("backends", existing_backends)
+        ngx.req.get_body_data = function() return "not-json" end
+
+        assert.has_no.errors(configuration.call)
+        assert.same(ngx.HTTP_BAD_REQUEST, ngx.status)
+        assert.same(existing_backends, ngx.shared.configuration_data:get("backends"))
       end)
 
       context("Failed to read request body", function()
@@ -183,6 +235,21 @@ describe("Configuration", function()
       assert.has_no.errors(configuration.handle_servers)
       assert.spy(s).was_called_with("Only POST requests are allowed!")
       assert.same(ngx.status, ngx.HTTP_BAD_REQUEST)
+    end)
+
+    it("rejects malformed configuration without changing certificate dictionaries", function()
+      certificate_servers:set("existing-host", UUID)
+      certificate_data:set(UUID, "pemCertKey")
+      mock_ssl_configuration({
+        servers = { ["malformed-host"] = true },
+        certificates = { [UUID] = "replacement" }
+      })
+
+      assert.has_no.errors(configuration.handle_servers)
+      assert.same(ngx.HTTP_BAD_REQUEST, ngx.status)
+      assert.same(UUID, certificate_servers:get("existing-host"))
+      assert.same(nil, certificate_servers:get("malformed-host"))
+      assert.same("pemCertKey", certificate_data:get(UUID))
     end)
 
     it("should not delete ocsp_response_cache if certificate remain the same", function()
