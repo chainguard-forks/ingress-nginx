@@ -971,6 +971,8 @@ nginx.ingress.kubernetes.io/mirror-host: "test.env.com"
 
 The request sent to the mirror is linked to the original request. If you have a slow mirror backend, then the original request will throttle.
 
+Every request that the controller mirrors carries the header `X-Ingress-Nginx-Mirror: 1`. The controller uses it to refuse mirrored requests on its internal `/configuration` endpoint, so a `mirror-target` cannot be used to change the controller's dynamic configuration. The header is also sent to your mirror backend, where it shows up in access logs. It can be ignored.
+
 For more information on the mirror module see [ngx_http_mirror_module](https://nginx.org/en/docs/http/ngx_http_mirror_module.html)
 
 

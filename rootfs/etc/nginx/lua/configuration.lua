@@ -6,6 +6,7 @@ local tostring = tostring
 local string = string
 local table = table
 local pairs = pairs
+local type = type
 
 -- this is the Lua representation of Configuration struct in internal/ingress/types.go
 local configuration_data = ngx.shared.configuration_data
@@ -62,6 +63,35 @@ local function get_pem_cert(hostname)
   return certificate_data:get(uid)
 end
 
+local function is_string_map(value)
+  if type(value) ~= "table" then
+    return false
+  end
+
+  for key, item in pairs(value) do
+    if type(key) ~= "string" or type(item) ~= "string" then
+      return false
+    end
+  end
+
+  return true
+end
+
+local function is_valid_backends(raw_value, value)
+  -- cjson decodes both an empty object and an empty array to an empty table.
+  if not string.match(raw_value, "^%s*%[") or type(value) ~= "table" then
+    return false
+  end
+
+  for _, backend in pairs(value) do
+    if type(backend) ~= "table" or type(backend.name) ~= "string" or backend.name == "" then
+      return false
+    end
+  end
+
+  return true
+end
+
 local function handle_servers()
   if ngx.var.request_method ~= "POST" then
     ngx.status = ngx.HTTP_BAD_REQUEST
@@ -74,6 +104,13 @@ local function handle_servers()
   local configuration, err = cjson.decode(raw_configuration)
   if not configuration then
     ngx.log(ngx.ERR, "could not parse configuration: ", err)
+    ngx.status = ngx.HTTP_BAD_REQUEST
+    return
+  end
+
+  if type(configuration) ~= "table" or not is_string_map(configuration.servers) or
+      not is_string_map(configuration.certificates) then
+    ngx.log(ngx.ERR, "invalid configuration: servers and certificates must be string maps")
     ngx.status = ngx.HTTP_BAD_REQUEST
     return
   end
@@ -193,14 +230,22 @@ local function handle_backends()
     return
   end
 
-  local backends = fetch_request_body()
-  if not backends then
+  local raw_backends = fetch_request_body()
+  if not raw_backends then
     ngx.log(ngx.ERR, "dynamic-configuration: unable to read valid request body")
     ngx.status = ngx.HTTP_BAD_REQUEST
     return
   end
 
-  local success, err = configuration_data:set("backends", backends)
+  local backends, decode_err = cjson.decode(raw_backends)
+  if not backends or not is_valid_backends(raw_backends, backends) then
+    ngx.log(ngx.ERR, "dynamic-configuration: rejecting invalid backends payload: " ..
+                    tostring(decode_err or "not an array of named backend objects"))
+    ngx.status = ngx.HTTP_BAD_REQUEST
+    return
+  end
+
+  local success, err = configuration_data:set("backends", raw_backends)
   if not success then
     ngx.log(ngx.ERR, "dynamic-configuration: error updating configuration: " .. tostring(err))
     ngx.status = ngx.HTTP_BAD_REQUEST
@@ -221,6 +266,11 @@ local function handle_backends()
 end
 
 function _M.call()
+  if ngx.var.http_x_ingress_nginx_mirror == "1" then
+    ngx.status = ngx.HTTP_FORBIDDEN
+    return
+  end
+
   if ngx.var.request_method ~= "POST" and ngx.var.request_method ~= "GET" then
     ngx.status = ngx.HTTP_BAD_REQUEST
     ngx.print("Only POST and GET requests are allowed!")
