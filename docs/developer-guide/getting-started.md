@@ -86,7 +86,7 @@ FOCUS="no-auth-locations" make kind-e2e-test
 
 Valid values are defined in the describe definition of the e2e tests like [Default Backend](https://github.com/kubernetes/ingress-nginx/blob/main/test/e2e/defaultbackend/default_backend.go#L29)
 
-The complete list of tests can be found [here](../e2e-tests.md)
+The tests are the Go files under `test/e2e/`. [This list](../e2e-tests.md) is a snapshot of them from 2026-02-02. Nothing generates it any more, so it can be out of date.
 
 **Run Helm unit tests**
 

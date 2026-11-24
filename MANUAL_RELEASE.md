@@ -1,5 +1,23 @@
 # RELEASE PROCESS
 
+> [!IMPORTANT]
+> This document is history. It describes how the original
+> [kubernetes/ingress-nginx](https://github.com/kubernetes/ingress-nginx) project, which is now archived, made a
+> release by hand. It is not how this repository is released. The cloud builds, the image promotion through
+> `kubernetes/k8s.io` and the other infrastructure that it relies on belong to the original project, and one script
+> that it names, `hack/generate-e2e-suite-doc.sh`, is no longer in this repository.
+>
+> Releases of this repository are made by two workflows:
+>
+> - [Create Controller Release](.github/workflows/controller-release.yml) creates the next `controller-v*` tag and
+>   its GitHub release when a file that matches its list of paths has changed since the last tag. The list is
+>   `SHIPPED_PATHS` in the workflow: every Go file, tests included, the `go.mod` and `go.sum` of the three modules
+>   that ship, the NGINX patches, the files under `rootfs/etc/nginx/` and the custom error pages.
+> - [Chart](.github/workflows/chart.yaml) releases the Helm chart when the version in
+>   `charts/ingress-nginx/Chart.yaml` differs from the last `helm-chart-*` tag.
+>
+> Both run every Monday at 00:00 UTC and can also be started by hand.
+
 ## 1. BUILD the new Ingress-Nginx-Controller image
 
 ### a. Make changes in codebase
