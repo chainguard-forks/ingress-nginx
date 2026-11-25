@@ -29,5 +29,13 @@ if [ -z "${PKG}" ]; then
   exit 1
 fi
 
-go test -v \
+# The tag kustomize_disable_go_plugin_support builds kustomize without its
+# loader for Go plugins. cmd/plugin/commands/ingresses gets that loader, and
+# with it Go's "plugin" package, through k8s.io/cli-runtime; nothing here uses
+# it. With cgo on, "plugin" makes Go link that test program with gcc, and on
+# linux/arm64 Go 1.26 then always asks gcc for the gold linker, which the test
+# image does not have ("collect2: fatal error: cannot find 'ld'"). The tag can
+# go when go.mod moves to Go 1.27, which asks for gold only where GNU ld is
+# too old.
+go test -v -tags kustomize_disable_go_plugin_support \
   $(go list "${PKG}/..." | grep -v vendor | grep -v '/test/e2e' | grep -v images | grep -v "docs/examples")
