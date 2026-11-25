@@ -1650,6 +1650,7 @@ func buildMirrorLocations(locs []*ingress.Location) string {
 		buffer.WriteString(fmt.Sprintf(`location = %v {
 internal;
 proxy_set_header Host %v;
+proxy_set_header X-Ingress-Nginx-Mirror "1";
 proxy_pass %v;
 }
 
