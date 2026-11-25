@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -30,23 +29,16 @@ import (
 
 	jsoniter "github.com/json-iterator/go"
 	apiv1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/ingress-nginx/internal/nginx"
 	"k8s.io/ingress-nginx/pkg/apis/ingress"
 )
 
 func TestConfigureDynamically(t *testing.T) {
-	listener, err := tryListen("tcp", fmt.Sprintf(":%v", nginx.StatusPort))
-	if err != nil {
-		t.Fatalf("creating tcp listener: %s", err)
-	}
+	listener := listenOnFreePort(t, &nginx.StatusPort)
 	defer listener.Close()
 
-	streamListener, err := tryListen("tcp", fmt.Sprintf(":%v", nginx.StreamPort))
-	if err != nil {
-		t.Fatalf("creating tcp listener: %s", err)
-	}
+	streamListener := listenOnFreePort(t, &nginx.StreamPort)
 	defer streamListener.Close()
 
 	endpointStats := map[string]int{"/configuration/backends": 0, "/configuration/general": 0, "/configuration/servers": 0}
@@ -138,7 +130,7 @@ func TestConfigureDynamically(t *testing.T) {
 		cfg:           &Configuration{},
 	}
 
-	err = n.configureDynamically(commonConfig)
+	err := n.configureDynamically(commonConfig)
 	if err != nil {
 		t.Errorf("unexpected error posting dynamic configuration: %v", err)
 	}
@@ -186,16 +178,10 @@ func TestConfigureDynamically(t *testing.T) {
 }
 
 func TestConfigureCertificates(t *testing.T) {
-	listener, err := tryListen("tcp", fmt.Sprintf(":%v", nginx.StatusPort))
-	if err != nil {
-		t.Fatalf("creating tcp listener: %s", err)
-	}
+	listener := listenOnFreePort(t, &nginx.StatusPort)
 	defer listener.Close()
 
-	streamListener, err := tryListen("tcp", fmt.Sprintf(":%v", nginx.StreamPort))
-	if err != nil {
-		t.Fatalf("creating tcp listener: %s", err)
-	}
+	streamListener := listenOnFreePort(t, &nginx.StreamPort)
 	defer streamListener.Close()
 
 	servers := []*ingress.Server{
@@ -253,7 +239,7 @@ func TestConfigureCertificates(t *testing.T) {
 	defer server.Close()
 	server.Start()
 
-	err = configureCertificates(servers)
+	err := configureCertificates(servers)
 	if err != nil {
 		t.Errorf("unexpected error posting dynamic certificate configuration: %v", err)
 	}
@@ -422,25 +408,32 @@ func TestCleanTempNginxCfg(t *testing.T) {
 	}
 }
 
-//nolint:unparam // Ignore `network` always receives `"tcp"` error
-func tryListen(network, address string) (l net.Listener, err error) {
-	condFunc := func() (bool, error) {
-		l, err = net.Listen(network, address)
-		if err == nil {
-			return true, nil
-		}
-		if strings.Contains(err.Error(), "bind: address already in use") {
-			return false, nil
-		}
-		return false, err
+// listenOnFreePort opens a TCP listener on a free port of the loopback
+// interface and stores that port in *port, which the caller passes as
+// &nginx.StatusPort or &nginx.StreamPort. The previous value comes back when
+// the test ends.
+//
+// A test must not listen on the default ports (10246 and 10247): go test runs
+// the test programs of several packages at the same time, the tests of other
+// packages use those ports too, and the tests of pkg/flags fail when one of
+// them is taken.
+func listenOnFreePort(t *testing.T, port *int) net.Listener {
+	t.Helper()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("creating tcp listener: %s", err)
 	}
 
-	backoff := wait.Backoff{
-		Duration: 500 * time.Millisecond,
-		Factor:   2,
-		Steps:    6,
-		Cap:      128 * time.Second,
+	addr, ok := listener.Addr().(*net.TCPAddr)
+	if !ok {
+		listener.Close()
+		t.Fatalf("unexpected address of the tcp listener: %v", listener.Addr())
 	}
-	err = wait.ExponentialBackoff(backoff, condFunc)
-	return
+
+	previous := *port
+	*port = addr.Port
+	t.Cleanup(func() { *port = previous })
+
+	return listener
 }

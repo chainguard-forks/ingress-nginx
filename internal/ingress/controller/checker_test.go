@@ -44,10 +44,7 @@ func TestNginxCheck(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			mux := http.NewServeMux()
 
-			listener, err := tryListen("tcp", fmt.Sprintf(":%v", nginx.StatusPort))
-			if err != nil {
-				t.Fatalf("creating tcp listener: %s", err)
-			}
+			listener := listenOnFreePort(t, &nginx.StatusPort)
 			defer listener.Close()
 			//nolint:gosec // Ignore not configured ReadHeaderTimeout in testing
 			server := &httptest.Server{
