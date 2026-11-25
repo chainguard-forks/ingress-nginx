@@ -21,12 +21,10 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/ingress-nginx/internal/nginx"
 )
@@ -99,10 +97,7 @@ func TestStatusCollector(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			listener, err := tryListen("tcp", fmt.Sprintf(":%v", nginx.StatusPort))
-			if err != nil {
-				t.Fatalf("crating unix listener: %s", err)
-			}
+			listener := listenOnFreePort(t, &nginx.StatusPort)
 
 			server := &httptest.Server{
 				Listener: listener,
@@ -151,24 +146,32 @@ func TestStatusCollector(t *testing.T) {
 	}
 }
 
-func tryListen(network, address string) (l net.Listener, err error) {
-	condFunc := func() (bool, error) {
-		l, err = net.Listen(network, address)
-		if err == nil {
-			return true, nil
-		}
-		if strings.Contains(err.Error(), "bind: address already in use") {
-			return false, nil
-		}
-		return false, err
+// listenOnFreePort opens a TCP listener on a free port of the loopback
+// interface and stores that port in *port, which the caller passes as
+// &nginx.StatusPort or &nginx.StreamPort. The previous value comes back when
+// the test ends.
+//
+// A test must not listen on the default ports (10246 and 10247): go test runs
+// the test programs of several packages at the same time, the tests of other
+// packages use those ports too, and the tests of pkg/flags fail when one of
+// them is taken.
+func listenOnFreePort(t *testing.T, port *int) net.Listener {
+	t.Helper()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("creating tcp listener: %s", err)
 	}
 
-	backoff := wait.Backoff{
-		Duration: 500 * time.Millisecond,
-		Factor:   2,
-		Steps:    6,
-		Cap:      128 * time.Second,
+	addr, ok := listener.Addr().(*net.TCPAddr)
+	if !ok {
+		listener.Close()
+		t.Fatalf("unexpected address of the tcp listener: %v", listener.Addr())
 	}
-	err = wait.ExponentialBackoff(backoff, condFunc)
-	return
+
+	previous := *port
+	*port = addr.Port
+	t.Cleanup(func() { *port = previous })
+
+	return listener
 }
