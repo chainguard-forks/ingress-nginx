@@ -535,6 +535,27 @@ export OTEL_TEMP_INSTALL=/tmp/otel
 mkdir -p ${OTEL_TEMP_INSTALL}
 
 cd ${BUILD_PATH}/opentelemetry-cpp-contrib-${OPENTELEMETRY_CONTRIB_COMMIT}/instrumentation/nginx
+
+NGINX_SRC_DIR="${BUILD_PATH}/nginx-${NGINX_VERSION}"
+if [ ! -f "${NGINX_SRC_DIR}/objs/ngx_auto_config.h" ] || [ ! -f "${NGINX_SRC_DIR}/objs/Makefile" ]; then
+  echo "patched nginx tree not configured: ${NGINX_SRC_DIR}" >&2
+  exit 1
+fi
+NGINX_INCS=$(awk '/^ALL_INCS *=/{f=1} f{print; if ($0 !~ /\\$/) exit}' "${NGINX_SRC_DIR}/objs/Makefile" \
+  | grep -o -- '-I *[^ \\]*' | sed 's/^-I *//' \
+  | while read -r d; do case "$d" in (/*) echo "$d" ;; (*) echo "${NGINX_SRC_DIR}/$d" ;; esac; done)
+if [ -z "${NGINX_INCS}" ]; then
+  echo "could not read ALL_INCS from ${NGINX_SRC_DIR}/objs/Makefile" >&2
+  exit 1
+fi
+echo "otel_ngx_module: nginx include dirs:"; echo "${NGINX_INCS}"
+{
+  echo "add_custom_target(project_nginx)"
+  echo "set(NGINX_INCLUDE_DIRS"
+  echo "${NGINX_INCS}" | sed 's/^/  /'
+  echo ")"
+} > nginx.cmake
+
 mkdir -p build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release \
