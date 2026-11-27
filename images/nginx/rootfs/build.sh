@@ -535,21 +535,26 @@ export OTEL_TEMP_INSTALL=/tmp/otel
 mkdir -p ${OTEL_TEMP_INSTALL}
 
 cd ${BUILD_PATH}/opentelemetry-cpp-contrib-${OPENTELEMETRY_CONTRIB_COMMIT}/instrumentation/nginx
-cat > nginx.cmake <<EOF
-set(NGINX_DIR "${BUILD_PATH}/nginx-${NGINX_VERSION}")
-if (NOT EXISTS "\${NGINX_DIR}/objs/ngx_auto_config.h")
-  message(FATAL_ERROR "patched nginx tree not configured: \${NGINX_DIR}")
-endif()
-add_custom_target(project_nginx)
-set(NGINX_INCLUDE_DIRS
-  \${NGINX_DIR}/objs
-  \${NGINX_DIR}/src/core
-  \${NGINX_DIR}/src/os/unix
-  \${NGINX_DIR}/src/event
-  \${NGINX_DIR}/src/http
-  \${NGINX_DIR}/src/http/modules
-)
-EOF
+
+NGINX_SRC_DIR="${BUILD_PATH}/nginx-${NGINX_VERSION}"
+if [ ! -f "${NGINX_SRC_DIR}/objs/ngx_auto_config.h" ] || [ ! -f "${NGINX_SRC_DIR}/objs/Makefile" ]; then
+  echo "patched nginx tree not configured: ${NGINX_SRC_DIR}" >&2
+  exit 1
+fi
+NGINX_INCS=$(awk '/^ALL_INCS *=/{f=1} f{print; if ($0 !~ /\\$/) exit}' "${NGINX_SRC_DIR}/objs/Makefile" \
+  | grep -o -- '-I *[^ \\]*' | sed 's/^-I *//' \
+  | while read -r d; do case "$d" in (/*) echo "$d" ;; (*) echo "${NGINX_SRC_DIR}/$d" ;; esac; done)
+if [ -z "${NGINX_INCS}" ]; then
+  echo "could not read ALL_INCS from ${NGINX_SRC_DIR}/objs/Makefile" >&2
+  exit 1
+fi
+echo "otel_ngx_module: nginx include dirs:"; echo "${NGINX_INCS}"
+{
+  echo "add_custom_target(project_nginx)"
+  echo "set(NGINX_INCLUDE_DIRS"
+  echo "${NGINX_INCS}" | sed 's/^/  /'
+  echo ")"
+} > nginx.cmake
 
 mkdir -p build
 cd build
