@@ -535,6 +535,22 @@ export OTEL_TEMP_INSTALL=/tmp/otel
 mkdir -p ${OTEL_TEMP_INSTALL}
 
 cd ${BUILD_PATH}/opentelemetry-cpp-contrib-${OPENTELEMETRY_CONTRIB_COMMIT}/instrumentation/nginx
+cat > nginx.cmake <<EOF
+set(NGINX_DIR "${BUILD_PATH}/nginx-${NGINX_VERSION}")
+if (NOT EXISTS "\${NGINX_DIR}/objs/ngx_auto_config.h")
+  message(FATAL_ERROR "patched nginx tree not configured: \${NGINX_DIR}")
+endif()
+add_custom_target(project_nginx)
+set(NGINX_INCLUDE_DIRS
+  \${NGINX_DIR}/objs
+  \${NGINX_DIR}/src/core
+  \${NGINX_DIR}/src/os/unix
+  \${NGINX_DIR}/src/event
+  \${NGINX_DIR}/src/http
+  \${NGINX_DIR}/src/http/modules
+)
+EOF
+
 mkdir -p build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release \
