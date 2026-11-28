@@ -1,0 +1,32 @@
+Resolver: fix off-by-one read in ngx_resolver_copy() for SRV records.
+
+Backport of upstream nginx edb4d2ffa746ba30bcae90e9527d5512b3de2c5b
+("Resolver: fixed off-by-one read in ngx_resolver_copy()", first released in
+nginx 1.29.6 / stable-1.28.3; cherry-pick 067c0b3f5 on stable-1.28):
+https://github.com/nginx/nginx/commit/edb4d2ffa746ba30bcae90e9527d5512b3de2c5b
+
+In ngx_resolver_process_srv(), the length check before ngx_resolver_copy() of
+an SRV record's target uses "i + 6 > n", so a record whose 6 bytes of fixed
+fields end exactly at the end of the message passes the check, and
+ngx_resolver_copy() then reads buf[n] (one byte past the message) before its
+own bounds check. Upstream changed the guard to "i + 6 >= n". Upstream believes
+it harmless (it only affects control flow; see the analogous 077a890a76ff), and
+it is not reachable in the configuration this image builds: nginx 1.27.1 has no
+"server ... resolve service=" (added in 1.27.3) and none of the bundled modules
+set ctx->service, so no SRV lookup is started. Backported for parity with the
+upstream resolver so a future "service=" user is not exposed.
+
+Compatibility: src/core/ngx_resolver.c only; no public header, struct, symbol or
+directive change, so no ABI impact for third-party modules.
+
+--- a/src/core/ngx_resolver.c
++++ b/src/core/ngx_resolver.c
+@@ -3024,7 +3024,7 @@ ngx_resolver_process_srv(ngx_resolver_t
+ 
+         case NGX_RESOLVE_SRV:
+ 
+-            if (i + 6 > n) {
++            if (i + 6 >= n) {
+                 goto short_response;
+             }
+ 
