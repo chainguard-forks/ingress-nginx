@@ -58,6 +58,17 @@ func (p *TCPProxy) Get(host string) *TCPServer {
 // Handle reads enough information from the connection to extract the hostname
 // and open a connection to the passthrough server.
 func (p *TCPProxy) Handle(conn net.Conn) {
+	// The ClientHello parser (pault.ag/go/sniff) slices by lengths taken from the ClientHello without
+	// bounding them against the data read, so a malformed ClientHello (e.g. an SNI extension length that
+	// exceeds the bytes received) panics with "slice bounds out of range". This connection runs in a bare
+	// goroutine with no other recover, so that panic would crash the whole controller. Recover here so one
+	// malformed connection is dropped and logged instead. Registered first, it runs last and catches the
+	// panic while the Close() defers below still run during unwinding.
+	defer func() {
+		if r := recover(); r != nil {
+			klog.Warningf("recovered while handling an SSL passthrough connection from %v: %v", conn.RemoteAddr(), r)
+		}
+	}()
 	defer conn.Close()
 	// See: https://www.ibm.com/docs/en/ztpf/1.1.0.15?topic=sessions-ssl-record-format
 	data := make([]byte, 16384)
@@ -69,7 +80,8 @@ func (p *TCPProxy) Handle(conn net.Conn) {
 	}
 
 	proxy := p.Default
-	hostname, err := parser.GetHostname(data)
+	// Parse only the bytes actually read; the zero padding past them would match a stale/empty SNI.
+	hostname, err := parser.GetHostname(data[:length])
 	if err == nil {
 		klog.V(4).InfoS("TLS Client Hello", "host", hostname)
 		proxy = p.Get(hostname)
